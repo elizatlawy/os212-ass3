@@ -696,7 +696,8 @@ char* itoa(int i, char b[]){
     }while(i);
     return b;
 }
-//remove swap file of proc p;
+// Delete the swap file for a given process p. Requires p->pid to be correctly initiated
+// remove swap file of proc p;
 int
 removeSwapFile(struct proc* p)
 {
@@ -764,7 +765,7 @@ removeSwapFile(struct proc* p)
 
 }
 
-
+// Creates a new swap file for a given process p. Requires p->pid to be correctly initiated
 //return 0 on success
 int
 createSwapFile(struct proc* p)
@@ -788,10 +789,10 @@ createSwapFile(struct proc* p)
   p->swapFile->readable = O_WRONLY;
   p->swapFile->writable = O_RDWR;
     end_op();
-
     return 0;
 }
 
+//Writes size bytes from buffer to the fileOffset index in the given process p swap file
 //return as sys_write (-1 when error)
 int
 writeToSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size)
@@ -800,10 +801,24 @@ writeToSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size)
   return kfilewrite(p->swapFile, (uint64)buffer, size);
 }
 
-//return as sys_read (-1 when error)
+// Reads size bytes into buffer from the fileOffset index in the given process p swap file
+// return as sys_read (-1 when error)
 int
 readFromSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size)
 {
   p->swapFile->off = placeOnFile;
   return kfileread(p->swapFile, (uint64)buffer,  size);
+}
+void copySwapFile(struct proc* p_source, struct proc* p_target){
+    if (p_source->pid < 3)
+        return;
+    char buff[PGSIZE];
+    for (int i = 0; i < MAX_TOTAL_PAGES-MAX_PYSC_PAGES; i++){
+        if (p_source->file_pages[i].state == USED){
+            if (readFromSwapFile(p_source, buff, PGSIZE*i, PGSIZE) != PGSIZE)
+                panic("CopySwapFile readFromSwapFile error");
+            if (writeToSwapFile(p_target, buff, PGSIZE*i, PGSIZE) != PGSIZE)
+                panic("CopySwapFile writeToSwapFile error");
+        }
+    }
 }

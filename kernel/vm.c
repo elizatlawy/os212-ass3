@@ -5,6 +5,7 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -108,7 +109,6 @@ walkaddr(pagetable_t pagetable, uint64 va)
 
   if(va >= MAXVA)
     return 0;
-
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     return 0;
@@ -429,3 +429,68 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+/// TASK 1
+int next_free_memory_page_index() {
+    struct proc *p = myproc();
+    if (p == 0)
+        return -1;
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        if (p->memory_pages[i].state == P_UNUSED)
+            return i;
+    }
+    return -1; // memory is full
+}
+
+int get_swap_out_page_index(){
+
+#if SCFIFO
+    return getSCFIFO();
+#endif
+    panic("Unrecognized paging machanism");
+}
+
+void swap(pagetable_t pagetable, uint64 user_page_va){
+    struct proc *p = myproc();
+    // move selected page from memory to swapFile
+    p->pages_in_file_counter++;
+    int out_index = get_swap_out_page_index();
+    int out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
+    if(out_page_pa == 0)
+        panic("inside swap out_page_pa is zero\n");
+
+    writePageToFile(proc, proc->ramCtrlr[outIndex].userPageVAddr, proc->ramCtrlr[outIndex].pgdir);
+    char *v = p2v(outPagePAddr);
+    kfree(v); //free swapped page
+    proc->ramCtrlr[outIndex].state = NOTUSED;
+    fixPagedOutPTE(proc->ramCtrlr[outIndex].userPageVAddr, proc->ramCtrlr[outIndex].pgdir);
+    addToRamCtrlr(pgdir, userPageVAddr);
+}
+
+
+int get_SCFIFO(){
+    struct proc *p = myproc();
+    pte_t pte;
+    int page_index;
+    uint64 first;
+    recheck:
+    page_index = -1;
+    first = INFINITY;
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= first){
+            page_index = i;
+            first = p->memory_pages[i].page_order;
+        }
+    }
+    pte = walkaddr(p->memory_pages[page_index].pagetable, p->memory_pages[page_index].user_page_VA);
+    if (*pte & PTE_A) {
+        *pte &= ~PTE_A; // turn off PTE_A flag
+        p->memory_pages[page_index].page_order = p->page_order_counter++;
+        goto recheck;
+    }
+    return pageIndex;
+}
+
+
+
+
