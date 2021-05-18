@@ -431,7 +431,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 }
 
 /// TASK 1
-int next_free_memory_page_index() {
+int get_free_memory_page_index() {
     struct proc *p = myproc();
     if (p == 0)
         return -1;
@@ -450,23 +450,86 @@ int get_swap_out_page_index(){
     panic("Unrecognized paging machanism");
 }
 
+void update_paged_out_flags(pagetable_t pagetable, uint64 user_page_va){
+    uint64 pte = walkaddr(pagetable, user_page_va);
+    if (!pte)
+        panic("PTE of swapped out page is missing\n");
+    *pte |= PTE_PG; // Paged out to secondary storage
+    *pte &= ~PTE_A; // turn off accessed bit
+    *pte &= PTE_FLAGS(*pte); // clear junk physical address
+    // todo: should we flush here?
+    sfence_vma(); //flush the TLB
+}
+
+void update_paged_in_flags(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa ){
+    uint64 pte = walkaddr(pagetable, user_page_va);
+    if (!pte)
+        panic("PTE of swapped in page is missing\n");
+    if(*pte & PTE_V)
+        panic("in update_paged_in_flags page is Valid!\n");
+    *pte |= PTE_V | PTE_W | PTE_U;      //Turn on needed bits
+    *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
+    *pte |= page_pa; // copy the physical page number
+    // todo: should we flush here?
+    sfence_vma(); // flush the TLB
+
+}
+
+void add_page_to_memory(pagetable_t pagetable, uint64 user_page_va) {
+    struct proc *p = myproc();
+    int free_index = get_free_memory_page_index();
+    p->memory_pages[free_index].state = P_USED;
+    p->memory_pages[free_index].pagetable = pagetable;
+    p->memory_pages[free_index].user_page_VA = user_page_va;
+    p->memory_pages[free_index].page_order = p->page_order_counter++;
+//    p->memory_pages[free_index].accessCount = 0;
+}
+
 void swap(pagetable_t pagetable, uint64 user_page_va){
     struct proc *p = myproc();
     // move selected page from memory to swapFile
-    p->pages_in_file_counter++;
     int out_index = get_swap_out_page_index();
-    int out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
+    uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
     if(out_page_pa == 0)
         panic("inside swap out_page_pa is zero\n");
-
-    writePageToFile(proc, proc->ramCtrlr[outIndex].userPageVAddr, proc->ramCtrlr[outIndex].pgdir);
-    char *v = p2v(outPagePAddr);
-    kfree(v); //free swapped page
-    proc->ramCtrlr[outIndex].state = NOTUSED;
-    fixPagedOutPTE(proc->ramCtrlr[outIndex].userPageVAddr, proc->ramCtrlr[outIndex].pgdir);
-    addToRamCtrlr(pgdir, userPageVAddr);
+    int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->memory_pages[out_index].pagetable);
+    if (result == -1)
+        panic("inside swap write_page_to_file failed\n");
+    // clear the page from memory
+    uint64 pa = PTE2PA(out_page_pa);
+    kfree((void*)pa); //free swapped page
+    p->memory_pages[out_index].state = P_UNUSED;
+    update_paged_out_flags(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
+    // move the requested page to memory
+    add_page_to_memory(pagetable, user_page_va);
 }
 
+int get_page_from_file(uint64 r_stval){
+    struct proc *p = myproc();
+//    proc->faultCounter++;
+    uint64 user_page_va = PGROUNDDOWN(r_stval);
+    char *new_page = kalloc();
+    // kalloc failed
+    if( new_page == 0)
+        return 0;
+    memset(new_page, 0, PGSIZE);
+    int free_index = get_free_memory_page_index();
+    // TODO: should we flush TLB here?
+//    sfence_vma(); //flush the TLB
+    // have free space in the memory
+    if(free_index > 0){
+        update_paged_in_flags(p->pagetable,user_page_va,PTE2PA(new_page));
+        read_page_from_file(p,free_index,user_page_va,(char*)user_page_va);
+        return 1;
+    }
+    // else memory is full & swapping is needed
+    // todo: CONTINUE form here
+
+
+
+
+
+}
 
 int get_SCFIFO(){
     struct proc *p = myproc();

@@ -822,3 +822,45 @@ void copySwapFile(struct proc* p_source, struct proc* p_target){
         }
     }
 }
+
+int get_free_file_index(struct proc * p) {
+    int max_page_num = (MAX_TOTAL_PAGES - MAX_PYSC_PAGES);
+    for (int i = 0; i < max_page_num; i++) {
+        if (p->file_pages[i].state == P_UNUSED)
+            return i;
+    }
+    return -1; // file is full
+}
+
+int write_page_to_file(struct proc * p, uint64 user_page_VA, pagetable_t pagetable) {
+    int free_index = get_free_file_index(p);
+    int result = writeToSwapFile(p, (char*)user_page_VA, PGSIZE*free_index, PGSIZE);
+    if (result == -1)
+        return -1;
+    //if reached here - data was successfully placed in file
+    p->file_pages[free_index].state = P_USED;
+    p->file_pages[free_index].user_page_VA = user_page_VA;
+    p->file_pages[free_index].pagetable = pagetable;
+//    p->file_pages[free_slot].accessCount = 0;
+    p->file_pages[free_index].page_order = 0;
+    p->pages_in_file_counter++;
+    return result;
+}
+
+int read_page_from_file(struct proc * p, int memory_index, int user_page_VA, char* buff) {
+    int max_page_num = (MAX_TOTAL_PAGES - MAX_PYSC_PAGES);
+    int result;
+    for (int i = 0; i < max_page_num; i++) {
+        if (p->file_pages[i].user_page_VA == user_page_VA) {
+            result = readFromSwapFile(p, buff, i*PGSIZE, PGSIZE);
+            if (result == -1)
+                break; //error in read
+            p->memory_pages[memory_index] = p->file_pages[i];
+            p->memory_pages[memory_index].page_order = p->page_order_counter++;
+            p->file_pages[i].state = P_UNUSED;
+            return result;
+        }
+    }
+    //if reached here - physical address given is not paged out (not found)
+    return -1;
+}
