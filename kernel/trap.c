@@ -68,9 +68,8 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
     // todo: IS THE COMPARISON IS OK?
-  } else if (r_scause() == 13 || r_scause() == 15){
-
-
+  } else if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15) && page_in_file(r_stval(), p->pagetable)){
+      get_page_from_file(r_scause());
   }
   else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
@@ -80,7 +79,6 @@ usertrap(void)
 
   if(p->killed)
     exit(-1);
-
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();
