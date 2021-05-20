@@ -143,8 +143,11 @@ kerneltrap() {
 
     if ((which_dev = devintr()) == 0) {
         if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15)) {
-            if (page_in_file(r_stval(), p->pagetable))
+            printf("inside kerneltrap got page fault\n");
+            if (page_in_file(r_stval(), p->pagetable)){
                 get_page_from_file(r_stval());
+                printf("inside kerneltrap got page from file\n");
+            }
             else{
                 printf("PID: %d inside kerneltrap() page is not in file\n", p->pid);
                 printf("scause %d PID: %d\n", scause, p->pid);

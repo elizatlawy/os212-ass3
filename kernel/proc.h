@@ -126,4 +126,5 @@ struct proc {
     struct page_metadata_struct memory_pages[MAX_PYSC_PAGES];
     uint64 page_order_counter; // count on load or creation
     uint64 pages_in_file_counter;
+    uint64 pages_in_memory_counter;
 };

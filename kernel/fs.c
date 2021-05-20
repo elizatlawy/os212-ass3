@@ -832,7 +832,8 @@ int get_free_file_index(struct proc * p) {
 
 int write_page_to_file(struct proc * p, uint64 user_page_VA, pagetable_t pagetable) {
     int free_index = get_free_file_index(p);
-    int result = writeToSwapFile(p, (char*)user_page_VA, PGSIZE*free_index, PGSIZE);
+    uint64 user_page_pa = walkaddr(pagetable,user_page_VA);
+    int result = writeToSwapFile(p, (char*) user_page_pa, PGSIZE*free_index, PGSIZE);
     if (result == -1)
         return -1;
     //if reached here - data was successfully placed in file
@@ -842,6 +843,7 @@ int write_page_to_file(struct proc * p, uint64 user_page_VA, pagetable_t pagetab
 //    p->file_pages[free_slot].accessCount = 0;
     p->file_pages[free_index].page_order = 0;
     p->pages_in_file_counter++;
+    p->pages_in_memory_counter--;
     return result;
 }
 
@@ -856,6 +858,7 @@ int read_page_from_file(struct proc * p, int memory_index, int user_page_VA, cha
             p->memory_pages[memory_index] = p->file_pages[i];
             p->memory_pages[memory_index].page_order = p->page_order_counter++;
             p->file_pages[i].state = P_UNUSED;
+            p->pages_in_file_counter--;
             return result;
         }
     }

@@ -118,6 +118,7 @@ allocproc(void) {
     p->pid = allocpid();
     p->state = USED;
 
+
     // Allocate a trapframe page.
     if ((p->trapframe = (struct trapframe *) kalloc()) == 0) {
         freeproc(p);
@@ -132,15 +133,11 @@ allocproc(void) {
         release(&p->lock);
         return 0;
     }
-
     if(p->pid > 2){
         release(&p->lock);
         createSwapFile(p);
         acquire(&p->lock);
     }
-
-
-
     // Set up new context to start executing at forkret,
     // which returns to user space.
     memset(&p->context, 0, sizeof(p->context));

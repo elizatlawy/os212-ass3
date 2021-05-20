@@ -103,7 +103,6 @@ uint64
 walkaddr(pagetable_t pagetable, uint64 va) {
     pte_t *pte;
     uint64 pa;
-
     if (va >= MAXVA)
         return 0;
     pte = walk(pagetable, va, 0);
@@ -170,7 +169,8 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) {
             panic("uvmunmap: not a leaf");
         if (do_free) {
             uint64 pa = PTE2PA(*pte);
-            kfree((void *) pa);
+            if(pa != 0)
+                kfree((void *) pa);
         }
         if(!is_none_policy()){
             remove_from_memory_meta_data(a,pagetable);
@@ -218,14 +218,13 @@ void swap(pagetable_t pagetable, uint64 user_page_va) {
     // move selected page from memory to swapFile
     int out_index = get_swap_out_page_index();
     uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
-    if (out_page_pa == 0)
-        panic("inside swap out_page_pa is zero\n");
+//    if (out_page_pa == 0)
+//        panic("inside swap out_page_pa is zero\n");
     int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->memory_pages[out_index].pagetable);
     if (result == -1)
         panic("inside swap write_page_to_file failed\n");
     // clear the page from memory
-    uint64 va = PA2PTE(out_page_pa);
-    kfree((void *) va); //free swapped page
+    kfree((void *) out_page_pa); //free swapped page
     p->memory_pages[out_index].state = P_UNUSED;
     update_page_out_pte(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
     // move the requested page to memory
@@ -247,17 +246,17 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             return 0;
         }
         else
-            printf("inisde uvmalloc() proc try to malloc: %d pages\n", PGROUNDUP(newsz)/PGSIZE);
+            printf("inisde uvmalloc() proc try to malloc total: %d pages\n", PGROUNDUP(newsz)/PGSIZE);
     }
     oldsz = PGROUNDUP(oldsz);
-    int num_of_new_pages = 0;
+    int num_of_new_page = 0;
     for (a = oldsz; a < newsz; a += PGSIZE) {
         mem = kalloc();
         if (mem == 0) {
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
-        num_of_new_pages++;
+        num_of_new_page++;
         memset(mem, 0, PGSIZE);
 
         if (mappages(pagetable, a, PGSIZE, (uint64) mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0) {
@@ -267,13 +266,15 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         }
         if(myproc()->pid > 2 && !is_none_policy()){
             // no more space in memory need to swap
-            if(PGROUNDUP(oldsz)/PGSIZE + num_of_new_pages > MAX_PYSC_PAGES){
-                printf("inisde uvmalloc() need to swap current num of pages: %d\n", PGROUNDUP(oldsz)/PGSIZE);
-                swap(pagetable,oldsz);
+            if(PGROUNDUP(oldsz)/PGSIZE + num_of_new_page > MAX_PYSC_PAGES){
+                printf("inisde uvmalloc() goign to swap new page num: %d\n",num_of_new_page);
+//                printf("inisde uvmalloc() need to swap old num of pages: %d\n", PGROUNDUP(oldsz)/PGSIZE);
+//                printf("new num of pages: %d\n", PGROUNDUP(newsz)/PGSIZE);
+                swap(pagetable,a);
             }
             // have space in memory
             else{
-                update_memory_page_metadata(pagetable,oldsz);
+                update_memory_page_metadata(pagetable,a);
             }
         }
     }
@@ -490,29 +491,27 @@ int get_swap_out_page_index() {
 }
 
 void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
-    uint64 pte = walkaddr(pagetable, user_page_va);
+    uint64 *pte = walk(pagetable, user_page_va,0);
     if (!pte)
         panic("PTE of swapped out page is missing\n");
-    pte |= PTE_PG; // Paged out to secondary storage
-    pte &= ~PTE_A; // turn off accessed bit
-    pte &= PTE_FLAGS(pte); // clear junk physical address
+    *pte |= PTE_PG; // Paged out to secondary storage
+    *pte &= ~PTE_A; // turn off accessed bit
+    *pte &= PTE_FLAGS(*pte); // clear junk physical address
     // todo: should we flush here?
     sfence_vma(); //flush the TLB
 }
 
 void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa) {
-    uint64 pte = walkaddr(pagetable, user_page_va);
+    uint64 *pte = walk(pagetable, user_page_va,0);
     if (!pte)
         panic("PTE of swapped in page is missing\n");
-    if (pte & PTE_V)
+    if (*pte & PTE_V)
         panic("in update_paged_in_flags page is Valid!\n");
-    pte |= PTE_V | PTE_W | PTE_U;      //Turn on needed bits
-    pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
-    pte |= page_pa; // copy the physical page number
+    *pte |= PTE_V | PTE_W | PTE_U;      //Turn on needed bits
+    *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
+    *pte |= page_pa; // copy the physical page number
     // todo: should we flush here?
     sfence_vma(); // flush the TLB
-
-
 
 }
 
@@ -524,6 +523,7 @@ void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     p->memory_pages[free_index].user_page_VA = user_page_va;
     p->memory_pages[free_index].page_order = p->page_order_counter++;
 //    p->memory_pages[free_index].accessCount = 0;
+    p->pages_in_memory_counter++;
 }
 
 int get_page_from_file(uint64 r_stval) {
@@ -543,7 +543,8 @@ int get_page_from_file(uint64 r_stval) {
     if (free_index > 0) {
         update_page_in_pte(p->pagetable, user_page_va, PTE2PA(*new_page));
         // TODO: DO WE NEED TO check if read_page_from_file succeed
-        read_page_from_file(p, free_index, user_page_va, (char *) user_page_va);
+        uint64 user_page_pa = walkaddr(p->pagetable, user_page_va);
+        read_page_from_file(p, free_index, user_page_va, (char *) user_page_pa);
         // page not found in file
         return 1;
     }
@@ -552,21 +553,26 @@ int get_page_from_file(uint64 r_stval) {
     struct page_metadata_struct out_page = p->memory_pages[out_index];
     // write page to file
     write_page_to_file(p,out_page.user_page_VA, out_page.pagetable);
-    int out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
+    uint64 out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
     // free physical memory
-    uint64 va = PA2PTE(out_page_pa);
-    kfree((void *) va); // free swapped page
+    kfree((void *) out_page_pa); // free swapped page
     // free pte & restore flags
     update_page_out_pte(out_page.pagetable, out_page.user_page_VA);
     // insert new page into memory
     update_page_in_pte(p->pagetable, user_page_va, PTE2PA(*new_page));
-    read_page_from_file(p, out_index, user_page_va, (char *) user_page_va);
+    uint64 user_page_pa = walkaddr(p->pagetable, user_page_va);
+    read_page_from_file(p, out_index, user_page_va, (char *) user_page_pa);
     return 1;
 }
 
 int page_in_file(uint64 user_page_va, pagetable_t pagetable){
-    uint64 page_pa = walkaddr(pagetable,user_page_va);
-    int found = (page_pa & PTE_PG); // if return 1 page is in file
+    printf("Num of pages in file: %d\n",myproc()->pages_in_file_counter);
+    for(int i = 0; i <MAX_TOTAL_PAGES-MAX_PYSC_PAGES; i++){
+        if(myproc()->file_pages[i].state == P_USED)
+            printf("THE %d ADDERS IS: %p\n",i,myproc()->file_pages[i].user_page_VA);
+    }
+    pte_t *pte = walk(pagetable,user_page_va,0);
+    int found = (*pte & PTE_PG); // if return 1 page is in file
     printf("inside page_in_file() found: %d\n",found);
     return found;
 }
@@ -599,7 +605,6 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
 
 int get_SCFIFO() {
     struct proc *p = myproc();
-    pte_t pte;
     int page_index;
     uint64 first;
     recheck:
@@ -611,9 +616,9 @@ int get_SCFIFO() {
             first = p->memory_pages[i].page_order;
         }
     }
-    pte = walkaddr(p->memory_pages[page_index].pagetable, p->memory_pages[page_index].user_page_VA);
-    if (pte & PTE_A) {
-        pte &= ~PTE_A; // turn off PTE_A flag
+    pte_t *pte = walk(p->memory_pages[page_index].pagetable, p->memory_pages[page_index].user_page_VA,0);
+    if (*pte & PTE_A) {
+        *pte &= ~PTE_A; // turn off PTE_A flag
         p->memory_pages[page_index].page_order = p->page_order_counter++;
         goto recheck;
     }
