@@ -161,7 +161,6 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) {
 
     if ((va % PGSIZE) != 0)
         panic("uvmunmap: not aligned");
-
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
         if ((pte = walk(pagetable, a, 0)) == 0)
             panic("uvmunmap: walk");
@@ -172,6 +171,9 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) {
         if (do_free) {
             uint64 pa = PTE2PA(*pte);
             kfree((void *) pa);
+        }
+        if(!is_none_policy()){
+            remove_from_memory_meta_data(a,pagetable);
         }
         *pte = 0;
     }
@@ -204,6 +206,32 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz) {
     memmove(mem, src, sz);
 }
 
+int is_none_policy(){
+#if NONE
+    return 1;
+#endif
+    return 0;
+}
+
+void swap(pagetable_t pagetable, uint64 user_page_va) {
+    struct proc *p = myproc();
+    // move selected page from memory to swapFile
+    int out_index = get_swap_out_page_index();
+    uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
+    if (out_page_pa == 0)
+        panic("inside swap out_page_pa is zero\n");
+    int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->memory_pages[out_index].pagetable);
+    if (result == -1)
+        panic("inside swap write_page_to_file failed\n");
+    // clear the page from memory
+    uint64 va = PA2PTE(out_page_pa);
+    kfree((void *) va); //free swapped page
+    p->memory_pages[out_index].state = P_UNUSED;
+    update_page_out_pte(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
+    // move the requested page to memory
+    update_memory_page_metadata(pagetable, user_page_va);
+}
+
 // Allocate PTEs and physical memory to grow process from oldsz to
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 uint64
@@ -213,23 +241,45 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
 
     if (newsz < oldsz)
         return oldsz;
-
+    if (!is_none_policy()){
+        if (PGROUNDUP(newsz) / PGSIZE > MAX_TOTAL_PAGES && myproc()->pid > 2) {
+            printf("proc has: %d pages more then 32\n", PGROUNDUP(newsz)/PGSIZE);
+            return 0;
+        }
+        else
+            printf("inisde uvmalloc() proc try to malloc: %d pages\n", PGROUNDUP(newsz)/PGSIZE);
+    }
     oldsz = PGROUNDUP(oldsz);
+    int num_of_new_pages = 0;
     for (a = oldsz; a < newsz; a += PGSIZE) {
         mem = kalloc();
         if (mem == 0) {
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
+        num_of_new_pages++;
         memset(mem, 0, PGSIZE);
+
         if (mappages(pagetable, a, PGSIZE, (uint64) mem, PTE_W | PTE_X | PTE_R | PTE_U) != 0) {
             kfree(mem);
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
+        if(myproc()->pid > 2 && !is_none_policy()){
+            // no more space in memory need to swap
+            if(PGROUNDUP(oldsz)/PGSIZE + num_of_new_pages > MAX_PYSC_PAGES){
+                printf("inisde uvmalloc() need to swap current num of pages: %d\n", PGROUNDUP(oldsz)/PGSIZE);
+                swap(pagetable,oldsz);
+            }
+            // have space in memory
+            else{
+                update_memory_page_metadata(pagetable,oldsz);
+            }
+        }
     }
     return newsz;
 }
+
 
 // Deallocate user pages to bring the process size from oldsz to
 // newsz.  oldsz and newsz need not be page-aligned, nor does newsz
@@ -242,6 +292,7 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
 
     if (PGROUNDUP(newsz) < PGROUNDUP(oldsz)) {
         int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
+
         uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
     }
 
@@ -288,12 +339,17 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz) {
     uint64 pa, i;
     uint flags;
     char *mem;
-
     for (i = 0; i < sz; i += PGSIZE) {
         if ((pte = walk(old, i, 0)) == 0)
             panic("uvmcopy: pte should exist");
+
+        if(*pte & PTE_PG){
+            update_page_out_pte(new,i);
+        }
+
         if ((*pte & PTE_V) == 0)
             panic("uvmcopy: page not present");
+
         pa = PTE2PA(*pte);
         flags = PTE_FLAGS(*pte);
         if ((mem = kalloc()) == 0)
@@ -428,7 +484,7 @@ int get_free_memory_page_index() {
 int get_swap_out_page_index() {
 
 #if SCFIFO
-    return getSCFIFO();
+    return get_SCFIFO();
 #endif
     panic("Unrecognized paging machanism");
 }
@@ -470,26 +526,9 @@ void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
 //    p->memory_pages[free_index].accessCount = 0;
 }
 
-void swap(pagetable_t pagetable, uint64 user_page_va) {
-    struct proc *p = myproc();
-    // move selected page from memory to swapFile
-    int out_index = get_swap_out_page_index();
-    uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
-    if (out_page_pa == 0)
-        panic("inside swap out_page_pa is zero\n");
-    int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->memory_pages[out_index].pagetable);
-    if (result == -1)
-        panic("inside swap write_page_to_file failed\n");
-    // clear the page from memory
-    uint64 va = PA2PTE(out_page_pa);
-    kfree((void *) va); //free swapped page
-    p->memory_pages[out_index].state = P_UNUSED;
-    update_page_out_pte(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
-    // move the requested page to memory
-    update_memory_page_metadata(pagetable, user_page_va);
-}
 int get_page_from_file(uint64 r_stval) {
     struct proc *p = myproc();
+    p->page_order_counter++;
 //    proc->faultCounter++;
     uint64 user_page_va = PGROUNDDOWN(r_stval);
     char *new_page = kalloc();
@@ -527,7 +566,35 @@ int get_page_from_file(uint64 r_stval) {
 
 int page_in_file(uint64 user_page_va, pagetable_t pagetable){
     uint64 page_pa = walkaddr(pagetable,user_page_va);
-    return (page_pa & PTE_PG); // if return 1 page is in file
+    int found = (page_pa & PTE_PG); // if return 1 page is in file
+    printf("inside page_in_file() found: %d\n",found);
+    return found;
+}
+
+// This must use user_page_va + pagetable addresses!
+// The proc has identical user_page_va on different page directories until exec finish executing
+void remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable) {
+    struct proc *p = myproc();
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        if (p->memory_pages[i].state == P_USED
+            && p->memory_pages[i].user_page_VA == user_page_va
+            && p->memory_pages[i].pagetable == pagetable) {
+            p->memory_pages[i].state = P_UNUSED;
+            return;
+        }
+    }
+}
+
+void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
+    struct proc *p = myproc();
+    for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
+        if (p->file_pages[i].state == P_USED
+            && p->file_pages[i].user_page_VA == user_page_va
+            && p->file_pages[i].pagetable == pagetable) {
+            p->file_pages[i].state = P_UNUSED;
+            return;
+        }
+    }
 }
 
 int get_SCFIFO() {

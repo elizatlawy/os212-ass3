@@ -133,8 +133,12 @@ allocproc(void) {
         return 0;
     }
 
-    if(p->pid > 2)
+    if(p->pid > 2){
+        release(&p->lock);
         createSwapFile(p);
+        acquire(&p->lock);
+    }
+
 
 
     // Set up new context to start executing at forkret,
@@ -295,7 +299,7 @@ fork(void) {
     np->sz = p->sz;
     // ignore init & shell proc
     if (p->pid > 2) {
-        copySwapFile(p, np);
+        copy_swap_file(p, np);
 //        np->loadOrderCounter = proc->loadOrderCounter;
         for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             np->memory_pages[i] = p->memory_pages[i]; //deep copy memory_pages list
@@ -453,12 +457,11 @@ void
 scheduler(void) {
     struct proc *p;
     struct cpu *c = mycpu();
-
     c->proc = 0;
+    int found = 0;
     for (;;) {
         // Avoid deadlock by ensuring that devices can interrupt.
         intr_on();
-
         for (p = proc; p < &proc[NPROC]; p++) {
             acquire(&p->lock);
             if (p->state == RUNNABLE) {
@@ -472,8 +475,13 @@ scheduler(void) {
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 c->proc = 0;
+                found = 1;
             }
             release(&p->lock);
+        }
+        if(found == 0) {
+            intr_on();
+            asm volatile("wfi");
         }
     }
 }

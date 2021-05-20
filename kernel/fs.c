@@ -243,7 +243,6 @@ static struct inode*
 iget(uint dev, uint inum)
 {
   struct inode *ip, *empty;
-
   acquire(&itable.lock);
 
   // Is the inode already in the table?
@@ -257,7 +256,6 @@ iget(uint dev, uint inum)
     if(empty == 0 && ip->ref == 0)    // Remember empty slot.
       empty = ip;
   }
-
   // Recycle an inode entry.
   if(empty == 0)
     panic("iget: no inodes");
@@ -770,7 +768,6 @@ removeSwapFile(struct proc* p)
 int
 createSwapFile(struct proc* p)
 {
-
   char path[DIGITS];
   memmove(path,"/.swap", 6);
   itoa(p->pid, path+ 6);
@@ -809,12 +806,13 @@ readFromSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size)
   p->swapFile->off = placeOnFile;
   return kfileread(p->swapFile, (uint64)buffer,  size);
 }
-void copySwapFile(struct proc* p_source, struct proc* p_target){
+void copy_swap_file(struct proc* p_source, struct proc* p_target){
     if (p_source->pid < 3)
         return;
     char buff[PGSIZE];
     for (int i = 0; i < MAX_TOTAL_PAGES-MAX_PYSC_PAGES; i++){
         if (p_source->file_pages[i].state == P_USED){
+
             if (readFromSwapFile(p_source, buff, PGSIZE*i, PGSIZE) != PGSIZE)
                 panic("CopySwapFile readFromSwapFile error");
             if (writeToSwapFile(p_target, buff, PGSIZE*i, PGSIZE) != PGSIZE)

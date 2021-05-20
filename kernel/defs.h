@@ -58,7 +58,7 @@ int		        createSwapFile(struct proc* p);
 int	          	readFromSwapFile(struct proc * p, char* buffer, uint placeOnFile, uint size);
 int		        writeToSwapFile(struct proc* p, char* buffer, uint placeOnFile, uint size);
 int		        removeSwapFile(struct proc* p);
-void		        copySwapFile(struct proc* p_source, struct proc* p_target);
+void		    copy_swap_file(struct proc* p_source, struct proc* p_target);
 int             write_page_to_file(struct proc * p, uint64 user_page_VA, pagetable_t pagetable);
 int             read_page_from_file(struct proc * p, int memory_index, int user_page_VA, char* buff);
 // ramdisk.c
@@ -184,6 +184,14 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 int             get_page_from_file(uint64 r_stval);
 int             page_in_file(uint64 user_page_va, pagetable_t pagetable);
+void            update_page_out_pte(pagetable_t pagetable, uint64 user_page_va);
+void            update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa);
+void            update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va);
+int             get_swap_out_page_index();
+int             get_SCFIFO();
+int             is_none_policy();
+void            remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable);
+void            remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable);
 
 // plic.c
 void            plicinit(void);

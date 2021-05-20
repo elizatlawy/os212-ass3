@@ -95,3 +95,9 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_page_fault_num(void)
+{
+    return myproc()->page_fault_counter;
+}

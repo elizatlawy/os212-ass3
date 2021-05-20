@@ -119,6 +119,7 @@ struct proc {
     struct file *ofile[NOFILE];  // Open files
     struct inode *cwd;           // Current directory
     char name[16];               // Process name (debugging)
+    int page_fault_counter;
 
     struct file *swapFile;
     struct page_metadata_struct file_pages[MAX_TOTAL_PAGES - MAX_PYSC_PAGES];
