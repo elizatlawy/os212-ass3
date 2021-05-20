@@ -266,7 +266,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         }
         if(myproc()->pid > 2 && !is_none_policy()){
             // no more space in memory need to swap
-            if(PGROUNDUP(oldsz)/PGSIZE + num_of_new_page > MAX_PYSC_PAGES){
+            if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES){
                 printf("inisde uvmalloc() goign to swap new page num: %d\n",num_of_new_page);
 //                printf("inisde uvmalloc() need to swap old num of pages: %d\n", PGROUNDUP(oldsz)/PGSIZE);
 //                printf("new num of pages: %d\n", PGROUNDUP(newsz)/PGSIZE);
