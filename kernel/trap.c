@@ -65,9 +65,21 @@ usertrap(void) {
     } else if ((which_dev = devintr()) != 0) {
         // ok
         // todo: IS THE COMPARISON IS OK?
-    } else if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15) && page_in_file(r_stval(), p->pagetable)) {
-        get_page_from_file(r_stval());
-    } else {
+    } else if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15)){
+        printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
+        if(page_in_file(r_stval(), p->pagetable)){
+            get_page_from_file(r_stval());
+            printf("PID: %d inside usertrap(): got page:  from file\n", p->pid);
+        }
+        else{
+            printf("PID: %d inside usertrap(): page: %p is not in file\n", p->pid,r_stval());
+            printf("usertrap(): unexpected scause %d pid=%d\n", r_scause(), p->pid);
+            printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+            p->killed = 1;
+        }
+
+    }
+    else {
         printf("usertrap(): unexpected scause %d pid=%d\n", r_scause(), p->pid);
         printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
         p->killed = 1;
@@ -143,10 +155,10 @@ kerneltrap() {
 
     if ((which_dev = devintr()) == 0) {
         if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15)) {
-            printf("inside kerneltrap got page fault\n");
+            printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
             if (page_in_file(r_stval(), p->pagetable)){
                 get_page_from_file(r_stval());
-                printf("inside kerneltrap got page from file\n");
+                printf("PID: %d inside kerneltrap(): got page: %p from file\n", p->pid, r_stval());
             }
             else{
                 printf("PID: %d inside kerneltrap() page is not in file\n", p->pid);

@@ -205,7 +205,6 @@ proc_pagetable(struct proc *p) {
         uvmfree(pagetable, 0);
         return 0;
     }
-
     return pagetable;
 }
 
@@ -234,7 +233,6 @@ uchar initcode[] = {
 void
 userinit(void) {
     struct proc *p;
-
     p = allocproc();
     initproc = p;
 
@@ -297,7 +295,7 @@ fork(void) {
     // ignore init & shell proc
     if (p->pid > 2) {
         copy_swap_file(p, np);
-//        np->loadOrderCounter = proc->loadOrderCounter;
+        np->page_order_counter = p->page_order_counter;
         for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             np->memory_pages[i] = p->memory_pages[i]; //deep copy memory_pages list
             np->memory_pages[i].pagetable = np->pagetable;  // replace parent pagetable with child new pagetable
@@ -307,7 +305,6 @@ fork(void) {
             np->file_pages[i].pagetable = np->pagetable;   // replace parent pagetable with child new pagetable
         }
     }
-
     // copy saved user registers.
     *(np->trapframe) = *(p->trapframe);
 
@@ -323,6 +320,8 @@ fork(void) {
     safestrcpy(np->name, p->name, sizeof(p->name));
 
     pid = np->pid;
+    np->page_fault_counter = 0;
+    np->pages_in_file_counter = p->pages_in_file_counter;
 
     release(&np->lock);
 

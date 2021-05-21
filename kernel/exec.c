@@ -39,6 +39,15 @@ exec(char *path, char **argv)
     goto bad;
 
   // Load program into memory.
+
+  if(!is_none_policy()){
+      if(myproc()->swapFile)
+          // delete parent copied swapFile
+          removeSwapFile(myproc());
+      // create new swapFile
+      createSwapFile(myproc());
+  }
+
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -125,6 +134,8 @@ exec(char *path, char **argv)
     iunlockput(ip);
     end_op();
   }
+  if(myproc()->swapFile)
+      removeSwapFile(myproc());
   return -1;
 }
 

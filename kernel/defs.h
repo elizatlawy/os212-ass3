@@ -60,7 +60,7 @@ int		        writeToSwapFile(struct proc* p, char* buffer, uint placeOnFile, uin
 int		        removeSwapFile(struct proc* p);
 void		    copy_swap_file(struct proc* p_source, struct proc* p_target);
 int             write_page_to_file(struct proc * p, uint64 user_page_VA, pagetable_t pagetable);
-int             read_page_from_file(struct proc * p, int memory_index, int user_page_VA, char* buff);
+int             read_page_from_file(struct proc * p, int memory_index, uint64 user_page_VA, char* buff);
 // ramdisk.c
 void            ramdiskinit(void);
 void            ramdiskintr(void);

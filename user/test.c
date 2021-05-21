@@ -18,7 +18,7 @@ void fork_test(){
         printf("new child created\n");
     }
 }
-#define ARR_SIZE 55000
+#define ARR_SIZE 85000
 
 void page_fault_test(){
     char * arr;
