@@ -242,7 +242,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         return oldsz;
     if (!is_none_policy()){
         if (PGROUNDUP(newsz) / PGSIZE > MAX_TOTAL_PAGES && myproc()->pid > 2) {
-            printf("PID: %d has: %d pages more then 32\n",myproc()->pid, PGROUNDUP(newsz)/PGSIZE);
+            printf("PID: %d try to kalloc: %d pages total is: %d more then 32\n",myproc()->pid,
+                   PGROUNDUP(newsz - oldsz)/PGSIZE, PGROUNDUP(newsz)/PGSIZE);
             return 0;
         }
         else if (myproc()->pid >= 1){
@@ -268,7 +269,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         if(myproc()->pid > 2 && !is_none_policy()){
             // no more space in memory need to swap
             // TODO: DECIDE IF REMOVE THIS +4 CONST
-            if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES + 4){
+            if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES){
                 printf("inisde uvmalloc() goign to swap new page num: %d\n",num_of_new_page);
                 swap(pagetable,a);
             }
@@ -494,7 +495,7 @@ void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     uint64 *pte = walk(pagetable, user_page_va,0);
     if (!pte)
         panic("PTE of swapped out page is missing\n");
-    *pte |= PTE_PG; // Paged out to secondary storage
+    *pte |= PTE_PG; // turn on Paged out to storage bit
     *pte &= ~PTE_V; // turn off accessed bit
     *pte &= PTE_FLAGS(*pte); // clear junk physical address
     sfence_vma(); //flush the TLB
@@ -509,11 +510,13 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
         panic("in update_paged_in_flags page is Valid!\n");
     printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
 //    *pte |= page_pa; // copy the physical page number
-    *pte = PA2PTE(page_pa); // copy the physical page number
+    *pte |= PA2PTE(page_pa); // copy the physical page number
     printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
     *pte |= PTE_V | PTE_W | PTE_U;      // Turn on needed bits
     *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
-    printf("inside update_page_in_pte(): Valid flag after update: %d\n",*pte & PTE_V);
+//   if(*pte & PTE_V && *pte & PTE_W && *pte & PTE_U  && !(*pte & PTE_PG) ){
+//       printf("inside update_page_in_pte() ALL FLAGS ARE ON\n");
+//   }
     sfence_vma(); // flush the TLB
 
 }
@@ -539,10 +542,11 @@ int get_page_from_file(uint64 r_stval) {
     // kalloc failed
     if (new_page == 0)
         return 0;
+    // clean the new page
     memset(new_page, 0, PGSIZE);
     int free_index = get_free_memory_page_index();
     // TODO: should we flush TLB here?
-    sfence_vma(); //flush the TLB
+//    sfence_vma(); //flush the TLB
     // have free space in the memory
     if (free_index >= 0) {
         update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page);
@@ -576,7 +580,7 @@ int get_page_from_file(uint64 r_stval) {
 int page_in_file(uint64 user_page_va, pagetable_t pagetable){
     printf("inside page_in_file() the recived VA is: %p\n",user_page_va);
     printf("Num of pages in file: %d\n",myproc()->pages_in_file_counter);
-    // for debugging only
+    // for debugging only print all addresses in file
     for(int i = 0; i <MAX_TOTAL_PAGES-MAX_PYSC_PAGES; i++){
         if(myproc()->file_pages[i].state == P_USED)
             printf("THE %d ADDERS IS: %p\n",i,myproc()->file_pages[i].user_page_VA);

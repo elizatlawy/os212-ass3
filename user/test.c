@@ -18,7 +18,11 @@ void fork_test(){
         printf("new child created\n");
     }
 }
-#define ARR_SIZE 85000
+//#define ARR_SIZE 85000
+// num of page fault with ARR_SIZE 85000 is: 41
+#define ARR_SIZE 75000
+// num of page fault with ARR_SIZE 75000 is: 37
+
 
 void page_fault_test(){
     char * arr;
