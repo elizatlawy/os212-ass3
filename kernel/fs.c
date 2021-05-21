@@ -783,16 +783,16 @@ readFromSwapFile(struct proc *p, char *buffer, uint placeOnFile, uint size) {
 void copy_swap_file(struct proc *p_source, struct proc *p_target) {
     if (p_source->pid < 3)
         return;
-    char buff[PGSIZE];
+    char* buffer = kalloc();
     for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
         if (p_source->file_pages[i].state == P_USED) {
-
-            if (readFromSwapFile(p_source, buff, PGSIZE * i, PGSIZE) != PGSIZE)
+            if (readFromSwapFile(p_source, buffer, PGSIZE * i, PGSIZE) != PGSIZE)
                 panic("CopySwapFile readFromSwapFile error");
-            if (writeToSwapFile(p_target, buff, PGSIZE * i, PGSIZE) != PGSIZE)
+            if (writeToSwapFile(p_target, buffer, PGSIZE * i, PGSIZE) != PGSIZE)
                 panic("CopySwapFile writeToSwapFile error");
         }
     }
+    kfree(buffer);
 }
 
 int get_free_file_index(struct proc *p) {

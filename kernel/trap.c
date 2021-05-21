@@ -65,7 +65,7 @@ usertrap(void) {
     } else if ((which_dev = devintr()) != 0) {
         // ok
         // todo: IS THE COMPARISON IS OK?
-    } else if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15)){
+    } else if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)){
         printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
         if(page_in_file(r_stval(), p->pagetable)){
             get_page_from_file(r_stval());
@@ -154,7 +154,7 @@ kerneltrap() {
         panic("kerneltrap: interrupts enabled");
 
     if ((which_dev = devintr()) == 0) {
-        if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15)) {
+        if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)) {
             printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
             if (page_in_file(r_stval(), p->pagetable)){
                 get_page_from_file(r_stval());
