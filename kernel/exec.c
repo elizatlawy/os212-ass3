@@ -38,10 +38,11 @@ exec(char *path, char **argv) {
         goto bad;
 
 
-    if (myproc()->swapFile)
-        // delete parent copied swapFile
-        removeSwapFile(myproc());
+
     if (!is_none_policy() && p->pid > 2) {
+        if (myproc()->swapFile)
+            // delete parent copied swapFile
+            removeSwapFile(myproc());
         // create new swapFile
         createSwapFile(myproc());
         for (int i = 0; i < MAX_PYSC_PAGES; i++)

@@ -133,7 +133,7 @@ allocproc(void) {
         release(&p->lock);
         return 0;
     }
-    if(p->pid > 2){
+    if(p->pid > 2 && !is_none_policy()){
         release(&p->lock);
         createSwapFile(p);
         acquire(&p->lock);
@@ -371,7 +371,7 @@ exit(int status) {
             p->ofile[fd] = 0;
         }
     }
-    if(p->pid > 2)
+    if(p->pid > 2 && !is_none_policy())
         removeSwapFile(p);
 
     begin_op();
