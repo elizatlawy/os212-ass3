@@ -112,6 +112,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
+void            update_pages_acceess_counter();
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -188,10 +189,14 @@ void            update_page_out_pte(pagetable_t pagetable, uint64 user_page_va);
 void            update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa);
 void            update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va);
 int             get_swap_out_page_index();
-int             get_SCFIFO();
+void            update_access_counter(struct proc *p);
+uint            num_of_ones(uint access_count);
 int             is_none_policy();
 void            remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable);
 void            remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable);
+int             SCFIFO_algorithm();
+int             LAPA_algorithm();
+int             NFUA_algorithm();
 
 // plic.c
 void            plicinit(void);

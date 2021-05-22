@@ -13,4 +13,3 @@
 #define MAXPATH      128   // maximum file path name
 #define MAX_PYSC_PAGES      16  // max num of pages in the physical memory
 #define MAX_TOTAL_PAGES     32 // total num of physical memory
-#define INFINITY 0xFFFFFFF

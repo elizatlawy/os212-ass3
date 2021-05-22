@@ -208,7 +208,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz) {
 }
 
 int is_none_policy(){
-#if NONE
+#ifdef NONE
     return 1;
 #endif
     return 0;
@@ -268,7 +268,6 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         }
         if(myproc()->pid > 2 && !is_none_policy()){
             // no more space in memory need to swap
-            // TODO: DECIDE IF REMOVE THIS +4 CONST
             if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES){
                 printf("inisde uvmalloc() goign to swap new page num: %d\n",num_of_new_page);
                 swap(pagetable,a);
@@ -471,7 +470,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max) {
     }
 }
 
-/// TASK 1
+
 int get_free_memory_page_index() {
     struct proc *p = myproc();
     if (p == 0)
@@ -483,13 +482,6 @@ int get_free_memory_page_index() {
     return -1; // memory is full
 }
 
-int get_swap_out_page_index() {
-
-#if SCFIFO
-    return get_SCFIFO();
-#endif
-    panic("Unrecognized paging machanism");
-}
 
 void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     uint64 *pte = walk(pagetable, user_page_va,0);
@@ -509,14 +501,10 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
     if (*pte & PTE_V)
         panic("in update_paged_in_flags page is Valid!\n");
     printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
-//    *pte |= page_pa; // copy the physical page number
     *pte |= PA2PTE(page_pa); // copy the physical page number
     printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
     *pte |= PTE_V | PTE_W | PTE_U;      // Turn on needed bits
     *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
-//   if(*pte & PTE_V && *pte & PTE_W && *pte & PTE_U  && !(*pte & PTE_PG) ){
-//       printf("inside update_page_in_pte() ALL FLAGS ARE ON\n");
-//   }
     sfence_vma(); // flush the TLB
 
 }
@@ -528,8 +516,13 @@ void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     p->memory_pages[free_index].pagetable = pagetable;
     p->memory_pages[free_index].user_page_VA = user_page_va;
     p->memory_pages[free_index].page_order = p->page_order_counter++;
-//    p->memory_pages[free_index].accessCount = 0;
     p->pages_in_memory_counter++;
+    #ifdef NFUA
+        p->memory_pages[free_index].access_count = 0;
+    #endif
+    #ifdef LAPA
+        p->memory_pages[free_index].access_count = -1 ; //0xFFFFFFFF
+    #endif
 }
 static char buff[PGSIZE];
 
@@ -600,6 +593,10 @@ void remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable) {
             && p->memory_pages[i].user_page_VA == user_page_va
             && p->memory_pages[i].pagetable == pagetable) {
             p->memory_pages[i].state = P_UNUSED;
+            #if defined(NFUA) || defined(LAPA)
+                p->memory_pages[i].access_count = 0;
+            #endif
+
             return;
         }
     }
@@ -617,17 +614,52 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
     }
 }
 
-int get_SCFIFO() {
+#if defined(NFUA) || defined(LAPA)
+// Updates the access counter in NFUA and LAPA paging policies
+void update_access_counter(struct proc * p){
+
+    uint addr = 1 << 31; // 10000000000000000000000000000000 in binary
+
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        if (p->memory_pages[i].state == P_USED){
+            p->memory_pages[i].access_count <<= 1; // Shift-right
+            pte_t *pte = walk(p->memory_pages[i].pagetable, p->memory_pages[i].user_page_VA,0);
+            if (*pte & PTE_A){
+                p->memory_pages[i].access_count |= addr; // add 1 to the most significant bit
+                *pte &= ~PTE_A; // turn off PTE_A flag
+            }
+        }
+    }
+}
+#endif
+
+#ifdef LAPA
+// Counts the number of turned on bits
+uint num_of_ones (uint access_count) {
+  int num_of_ones = 0;
+  while(access_count) {
+    if (access_count%2 != 0)
+        num_of_ones++;
+    access_count /= 2;
+  }
+  return num_of_ones;
+}
+#endif
+
+#ifdef SCFIFO
+// Second Chance FIFO - Page Replacement Algorithm
+int SCFIFO_algorithm() {
+
     struct proc *p = myproc();
     int page_index;
-    uint64 first;
+    uint64 page_order;
     recheck:
     page_index = -1;
-    first = INFINITY;
+    page_order = -1;
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= first) {
+        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= page_order) {
             page_index = i;
-            first = p->memory_pages[i].page_order;
+            page_order = p->memory_pages[i].page_order;
         }
     }
     pte_t *pte = walk(p->memory_pages[page_index].pagetable, p->memory_pages[page_index].user_page_VA,0);
@@ -638,6 +670,66 @@ int get_SCFIFO() {
     }
     return page_index;
 }
+#endif
+
+#ifdef NFUA
+// Not Frequently Used With Aging Page Replacement Algorithm
+int NFUA_algorithm(){
+
+    struct proc *p = myproc();
+    int page_index = -1;
+    uint best = -1;
+    uint curr = -1;
+
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        if (p->memory_pages[i].state == P_USED){
+            curr = p->memory_pages[i].access_count;
+            if(curr < best){
+                best = curr;
+                page_index = i;
+            }
+        }
+    }
+    return page_index;
+}
+#endif
+
+#ifdef LAPA
+// Least Accessed Page With Aging Page Replacement Algorithm
+int LAPA_algorithm(){
+
+    struct proc *p = myproc();
+    int page_index = -1;
+    uint best = -1;
+    uint curr = -1;
+
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        if (p->memory_pages[i].state == P_USED) {
+            curr = num_of_ones(p->memory_pages[i].access_count);
+            if(curr < best || (curr == best && p->memory_pages[i].access_count < p->memory_pages[page_index].access_count)){
+                best = curr;
+                page_index = i;
+            }
+        }
+    }
+    return page_index;
+}
+#endif
+
+int get_swap_out_page_index() {
+
+    #ifdef SCFIFO
+        return SCFIFO_algorithm();
+    #endif
+    #ifdef LAPA
+        return LAPA_algorithm();
+    #endif
+    #ifdef NFUA
+        return NFUA_algorithm();
+    #endif
+    panic("Unrecognized paging machanism");
+}
+
 
 
 

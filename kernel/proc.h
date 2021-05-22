@@ -93,7 +93,10 @@ struct page_metadata_struct {
     enum page_metadata_state state;
     pagetable_t pagetable;
     uint64 user_page_VA;
-    uint64 page_order;
+    uint page_order;
+    #if defined(NFUA) || defined(LAPA)
+        uint access_count;
+    #endif
 };
 
 // Per-process state

@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+
+
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -590,8 +592,8 @@ wakeup(void *chan) {
 // to user space (see usertrap() in trap.c).
 int
 kill(int pid) {
-    struct proc *p;
 
+    struct proc *p;
     for (p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         if (p->pid == pid) {
@@ -663,3 +665,16 @@ procdump(void) {
         printf("\n");
     }
 }
+
+#if defined(NFUA) || defined(LAPA)
+void update_pages_acceess_counter(){
+    struct proc *p;
+    for (p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if ((p->pid > 2) && (p->state == SLEEPING || p->state == RUNNABLE || p->state == RUNNING)) {
+            update_access_counter(p); // implemented in vm.c
+        }
+        release(&p->lock);
+    }
+}
+#endif
