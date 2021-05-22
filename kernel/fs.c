@@ -766,7 +766,6 @@ createSwapFile(struct proc *p) {
 //return as sys_write (-1 when error)
 int
 writeToSwapFile(struct proc *p, char *buffer, uint placeOnFile, uint size) {
-    printf("PID: %d inside writeToSwapFile() - write to file from offset: %d\n",myproc()->pid,placeOnFile);
     p->swapFile->off = placeOnFile;
     int num_of_write_bits = kfilewrite(p->swapFile, (uint64) buffer, size);
     return num_of_write_bits;
@@ -776,7 +775,6 @@ writeToSwapFile(struct proc *p, char *buffer, uint placeOnFile, uint size) {
 // return as sys_read (-1 when error)
 int
 readFromSwapFile(struct proc *p, char *buffer, uint placeOnFile, uint size) {
-    printf("PID: %d inside readFromSwapFile() - read from file from offset: %d\n",myproc()->pid,placeOnFile);
     p->swapFile->off = placeOnFile;
     int num_of_read_bits = kfileread(p->swapFile, (uint64) buffer, size);
     return num_of_read_bits;
@@ -828,6 +826,7 @@ int write_page_to_file(struct proc *p, uint64 user_page_VA, pagetable_t pagetabl
     p->file_pages[free_index].page_order = 0;
     p->pages_in_file_counter++;
     p->pages_in_memory_counter--;
+    printf("PID: %d in write_page_to_file(): added page addr: %p to file\n",p->pid,user_page_VA);
     return result;
 }
 
@@ -843,6 +842,7 @@ int read_page_from_file(struct proc *p, int memory_index, uint64 user_page_VA, c
             p->memory_pages[memory_index].page_order = p->page_order_counter++;
             p->file_pages[i].state = P_UNUSED;
             p->pages_in_file_counter--;
+            printf("PID: %d in read_page_from_file(): added page addr: %p to ram\n",p->pid,user_page_VA);
             return result;
         }
     }

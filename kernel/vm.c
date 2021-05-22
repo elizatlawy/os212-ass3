@@ -240,20 +240,9 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
     uint64 a;
     if (newsz < oldsz)
         return oldsz;
-    if (!is_none_policy()){
-        if (PGROUNDUP(newsz) / PGSIZE > MAX_TOTAL_PAGES && p->pid > 2) {
-            printf("PID: %d inisde uvmalloc() try to kalloc: %d pages total is: %d more then 32\n",p->pid,
-                   PGROUNDUP(newsz - oldsz)/PGSIZE - 4, PGROUNDUP(newsz)/PGSIZE - 4);
-            printf("Prock is too big\n");
-            return 0;
-        }
-        else if (myproc()->pid > 2){
-            printf("PID: %d inisde uvmalloc()  proc have: %d pages\n",p->pid,PGROUNDUP(oldsz)/PGSIZE);
-            printf("PID: %d inisde uvmalloc() proc try to malloc: %d new pages\n",p->pid, PGROUNDUP(newsz - oldsz)/PGSIZE);
-        }
-    }
     oldsz = PGROUNDUP(oldsz);
     int num_of_new_page = 0;
+    int old_num_of_pages_in_mem = p->pages_in_memory_counter;
     for (a = oldsz; a < newsz; a += PGSIZE) {
         num_of_new_page++;
         mem = kalloc();
@@ -268,10 +257,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             return 0;
         }
         if(p->pid > 2 && !is_none_policy() && p->pagetable == pagetable){
-            // no more space in memory need to swap
-            // TODO: +4 since the proc have 4 kernel pages that we do not swap or count
-            if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES + 4){
-                // no space in memory
+            if(p->pages_in_memory_counter + p->pages_in_file_counter >= MAX_TOTAL_PAGES){
+                printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
+                panic("Prock is too big\n");
+            }
+            if(old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES){
+                // no more space in memory need to swap
                 printf("uvmalloc(): no space in memory going to swap for new page num: %d\n",num_of_new_page);
                 swap(pagetable,a);
             }
@@ -532,7 +523,7 @@ void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     p->memory_pages[free_index].page_order = p->page_order_counter++;
 //    p->memory_pages[free_index].accessCount = 0;
     p->pages_in_memory_counter++;
-    printf("PID: %d inside update_memory_page_metadata() added new page addr: %p num of page in mem: %d\n",p->pid,user_page_va,p->pages_in_memory_counter);
+    printf("PID: %d inside update_memory_page_metadata() added new page to ram addr: %p num of page in mem: %d\n",p->pid,user_page_va,p->pages_in_memory_counter);
 }
 static char buff[PGSIZE];
 
