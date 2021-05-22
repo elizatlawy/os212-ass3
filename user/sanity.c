@@ -4,7 +4,8 @@
 #include "kernel/fs.h"
 
 #define PGSIZE 4096
-#define ARR_SIZE 55000
+//#define ARR_SIZE 55000
+#define ARR_SIZE 75000
 
 /*
 	Test used to check the swapping machanism in fork.
@@ -13,29 +14,31 @@
 void forkTest(){
     int i;
     char * arr;
-    arr = malloc (50000); //allocates 13 pages (sums to 16), in lifo, OS puts page #15 in file.
+//    arr = malloc (50000); //allocates 13 pages (sums to 16), in lifo, OS puts page #15 in file.
+    arr = malloc (60000); //allocates 14 pages (sums to 17), in lifo, OS puts page #16 in file.
+
 
     for (i = 0; i < 50; i++) {
-        arr[49100+i] = 'A'; //last six A's stored in page #16, the rest in #15
-        arr[45200+i] = 'B'; //all B's are stored in page #15.
+        arr[59100+i] = 'A'; //last six A's stored in page #17, the rest in #16
+        arr[55200+i] = 'B'; //all B's are stored in page #16.
     }
-    arr[49100+i] = 0; //for null terminating string...
-    arr[45200+i] = 0;
+    arr[59100+i] = 0; //for null terminating string...
+    arr[55200+i] = 0;
 
     if (fork() == 0){ //is son
         for (i = 40; i < 50; i++) {
-            arr[49100+i] = 'C'; //changes last ten A's to C
-            arr[45200+i] = 'D'; //changes last ten B's to D
+            arr[59100+i] = 'C'; //changes last ten A's to C
+            arr[55200+i] = 'D'; //changes last ten B's to D
         }
-        printf("SON: %s\n",&arr[49100]); // should print AAAAA..CCC...
-        printf("SON: %s\n",&arr[45200]); // should print BBBBB..DDD...
+        printf("SON: %s\n",&arr[59100]); // should print AAAAA..CCC...
+        printf("SON: %s\n",&arr[55200]); // should print BBBBB..DDD...
         printf("\n");
         free(arr);
         exit(0);
     } else { //is parent
         wait(0);
-        printf("PARENT: %s\n",&arr[49100]); // should print AAAAA...
-        printf("PARENT: %s\n",&arr[45200]); // should print BBBBB...
+        printf("PARENT: %s\n",&arr[59100]); // should print AAAAA...
+        printf("PARENT: %s\n",&arr[55200]); // should print BBBBB...
         free(arr);
     }
 }
@@ -81,7 +84,7 @@ void globalTest(){
 
 
 int main(int argc, char *argv[]){
-//    globalTest();			//for testing each policy efficiency
-    forkTest();			//for testing swapping machanism in fork.
+    globalTest();			//for testing each policy efficiency
+//    forkTest();			//for testing swapping machanism in fork.
     exit(0);
 }

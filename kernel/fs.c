@@ -768,7 +768,8 @@ int
 writeToSwapFile(struct proc *p, char *buffer, uint placeOnFile, uint size) {
     printf("PID: %d inside writeToSwapFile() - write to file from offset: %d\n",myproc()->pid,placeOnFile);
     p->swapFile->off = placeOnFile;
-    return kfilewrite(p->swapFile, (uint64) buffer, size);
+    int num_of_write_bits = kfilewrite(p->swapFile, (uint64) buffer, size);
+    return num_of_write_bits;
 }
 
 // Reads size bytes into buffer from the fileOffset index in the given process p swap file
@@ -777,19 +778,26 @@ int
 readFromSwapFile(struct proc *p, char *buffer, uint placeOnFile, uint size) {
     printf("PID: %d inside readFromSwapFile() - read from file from offset: %d\n",myproc()->pid,placeOnFile);
     p->swapFile->off = placeOnFile;
-    return kfileread(p->swapFile, (uint64) buffer, size);
+    int num_of_read_bits = kfileread(p->swapFile, (uint64) buffer, size);
+    return num_of_read_bits;
 }
 
 void copy_swap_file(struct proc *p_source, struct proc *p_target) {
     if (p_source->pid < 3)
         return;
     char* buffer = kalloc();
+    int result;
     for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
         if (p_source->file_pages[i].state == P_USED) {
-            if (readFromSwapFile(p_source, buffer, PGSIZE * i, PGSIZE) != PGSIZE)
-                panic("CopySwapFile readFromSwapFile error");
-            if (writeToSwapFile(p_target, buffer, PGSIZE * i, PGSIZE) != PGSIZE)
-                panic("CopySwapFile writeToSwapFile error");
+            result = readFromSwapFile(p_source, buffer, PGSIZE * i, PGSIZE);
+            if (result != PGSIZE){
+                printf("CopySwapFile readFromSwapFile error, read: %d bits\n",result);
+            }
+
+            result = writeToSwapFile(p_target, buffer, PGSIZE * i, PGSIZE);
+            if ( result != PGSIZE){
+                printf("CopySwapFile writeToSwapFile error, write: %d bits\n",result);
+            }
         }
     }
     kfree(buffer);
@@ -812,14 +820,7 @@ int write_page_to_file(struct proc *p, uint64 user_page_VA, pagetable_t pagetabl
     int result = writeToSwapFile(p, (char *) user_page_pa, PGSIZE * free_index, PGSIZE);
     if (result == -1)
         return -1;
-//    result = readFromSwapFile(p, buff, PGSIZE * free_index, PGSIZE);
-//    printf("going to print buff\n");
-//    for (int i = 0; i < 4096; i++) {
-//        if (buff[i] != 0)
-//            printf("%c", buff[i]);
-//    }
-//    printf("finished to print buff\n");
-    //if reached here - data was successfully placed in file
+    //if reached here - data was successfully placed in file need to update meta_data
     p->file_pages[free_index].state = P_USED;
     p->file_pages[free_index].user_page_VA = user_page_VA;
     p->file_pages[free_index].pagetable = pagetable;

@@ -267,12 +267,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
-        if(p->pid > 2 && !is_none_policy()){
+        if(p->pid > 2 && !is_none_policy() && p->pagetable == pagetable){
             // no more space in memory need to swap
             // TODO: +4 since the proc have 4 kernel pages that we do not swap or count
             if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES + 4){
                 // no space in memory
-                printf("uvmalloc():no space in memory going to swap for new page num: %d\n",num_of_new_page);
+                printf("uvmalloc(): no space in memory going to swap for new page num: %d\n",num_of_new_page);
                 swap(pagetable,a);
             }
             // have space in memory
@@ -600,6 +600,7 @@ void remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable) {
             && p->memory_pages[i].user_page_VA == user_page_va
             && p->memory_pages[i].pagetable == pagetable) {
             p->memory_pages[i].state = P_UNUSED;
+            p->pages_in_memory_counter--;
             return;
         }
     }
@@ -612,6 +613,7 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
             && p->file_pages[i].user_page_VA == user_page_va
             && p->file_pages[i].pagetable == pagetable) {
             p->file_pages[i].state = P_UNUSED;
+            p->pages_in_file_counter--;
             return;
         }
     }

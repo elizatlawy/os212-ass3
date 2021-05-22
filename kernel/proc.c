@@ -170,10 +170,11 @@ freeproc(struct proc *p) {
             p->memory_pages[i].state = P_UNUSED;
         for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++)
             p->file_pages[i].state = P_UNUSED;
-
-        removeSwapFile(p);
     }
-
+    p->page_order_counter = 0;
+    p->pages_in_file_counter = 0;
+    p->pages_in_memory_counter = 0;
+    p->page_fault_counter = 0;
     p->state = UNUSED;
 }
 
@@ -294,14 +295,19 @@ fork(void) {
     np->sz = p->sz;
     // ignore init & shell proc
     if (p->pid > 2) {
+        release(&np->lock);
         copy_swap_file(p, np);
+        acquire(&np->lock);
+        np->page_fault_counter = 0;
         np->page_order_counter = p->page_order_counter;
+        np->pages_in_file_counter = p->pages_in_file_counter;
+        np->pages_in_memory_counter = p->pages_in_memory_counter;
         for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-            np->memory_pages[i] = p->memory_pages[i]; //deep copy memory_pages list
+            np->memory_pages[i] = p->memory_pages[i]; // copy memory_pages list
             np->memory_pages[i].pagetable = np->pagetable;  // replace parent pagetable with child new pagetable
         }
         for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
-            np->file_pages[i] = p->file_pages[i]; // deep copies file_pages list
+            np->file_pages[i] = p->file_pages[i]; //  copies file_pages list
             np->file_pages[i].pagetable = np->pagetable;   // replace parent pagetable with child new pagetable
         }
     }
@@ -320,9 +326,6 @@ fork(void) {
     safestrcpy(np->name, p->name, sizeof(p->name));
 
     pid = np->pid;
-    np->page_fault_counter = 0;
-    np->pages_in_file_counter = p->pages_in_file_counter;
-
     release(&np->lock);
 
     acquire(&wait_lock);
@@ -368,6 +371,8 @@ exit(int status) {
             p->ofile[fd] = 0;
         }
     }
+    if(p->pid > 2)
+        removeSwapFile(p);
 
     begin_op();
     iput(p->cwd);
