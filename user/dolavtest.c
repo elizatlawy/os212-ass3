@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
 //    priority_test(); // passed
 //    exec_test(); // passed
 //    alloc_dealloc_test(); // passed
-//    advance_alloc_dealloc_test(); // passed
-//    child_test(); // fails!!!
+    advance_alloc_dealloc_test(); // passed
+//    child_test(); // passed
     exit(0);
 }
