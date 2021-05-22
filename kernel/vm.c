@@ -228,7 +228,7 @@ void swap(pagetable_t pagetable, uint64 user_page_va) {
     p->memory_pages[out_index].state = P_UNUSED;
     update_page_out_pte(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
     // move the requested page to memory
-    update_memory_page_metadata(pagetable, user_page_va);
+    add_to_memory_page_metadata(pagetable, user_page_va);
 }
 
 // Allocate PTEs and physical memory to grow process from oldsz to
@@ -268,7 +268,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             }
             // have space in memory
             else{
-                update_memory_page_metadata(pagetable,a);
+                add_to_memory_page_metadata(pagetable,a);
             }
         }
     }
@@ -514,7 +514,7 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
 
 }
 
-void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
+void add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     struct proc *p = myproc();
     int free_index = get_free_memory_page_index();
     p->memory_pages[free_index].state = P_USED;
@@ -523,7 +523,6 @@ void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     p->memory_pages[free_index].page_order = p->page_order_counter++;
 //    p->memory_pages[free_index].accessCount = 0;
     p->pages_in_memory_counter++;
-    printf("PID: %d inside update_memory_page_metadata() added new page to ram addr: %p num of page in mem: %d\n",p->pid,user_page_va,p->pages_in_memory_counter);
 }
 static char buff[PGSIZE];
 
