@@ -266,7 +266,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             return 0;
         }
         if (p->pid > 2 && !is_none_policy() && p->pagetable == pagetable) {
-            if (p->pages_in_memory_counter + p->pages_in_file_counter > MAX_TOTAL_PAGES) {
+            if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
                 printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
                 panic("Prock is too big\n");
             }
