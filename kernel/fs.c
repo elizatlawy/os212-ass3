@@ -842,6 +842,7 @@ int read_page_from_file(struct proc *p, int memory_index, uint64 user_page_VA, c
             p->memory_pages[memory_index].page_order = p->page_order_counter++;
             p->file_pages[i].state = P_UNUSED;
             p->pages_in_file_counter--;
+            p->pages_in_memory_counter++;
             printf("PID: %d in read_page_from_file(): added page addr: %p to ram\n",p->pid,user_page_VA);
             return result;
         }

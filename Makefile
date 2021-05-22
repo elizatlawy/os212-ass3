@@ -141,7 +141,8 @@ UPROGS=\
 	$U/_lazytests\
 	$U/_test\
 	$U/_sanity\
-	$U/_sanity\
+	$U/_dolavtest\
+
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
