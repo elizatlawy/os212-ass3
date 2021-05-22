@@ -5,53 +5,55 @@
 
 #define PGSIZE 4096
 //#define ARR_SIZE 55000
-#define ARR_SIZE 75000
+#define ARR_SIZE 74096 // arr with size of 19 pages
 
 /*
 	Test used to check the swapping machanism in fork.
 	Best tested when LIFO is used (for more swaps)
 */
-void forkTest(){
+void forkTest() {
     int i;
-    char * arr;
+    char *arr;
 //    arr = malloc (50000); //allocates 13 pages (sums to 16), in lifo, OS puts page #15 in file.
-    arr = malloc (60000); //allocates 14 pages (sums to 17), in lifo, OS puts page #16 in file.
+    arr = malloc(60000); //allocates 14 pages (sums to 17), in lifo, OS puts page #16 in file.
 
 
     for (i = 0; i < 50; i++) {
-        arr[59100+i] = 'A'; //last six A's stored in page #17, the rest in #16
-        arr[55200+i] = 'B'; //all B's are stored in page #16.
+        arr[59100 + i] = 'A'; //last six A's stored in page #17, the rest in #16
+        arr[55200 + i] = 'B'; //all B's are stored in page #16.
     }
-    arr[59100+i] = 0; //for null terminating string...
-    arr[55200+i] = 0;
+    arr[59100 + i] = 0; //for null terminating string...
+    arr[55200 + i] = 0;
 
-    if (fork() == 0){ //is son
+    if (fork() == 0) { //is son
         for (i = 40; i < 50; i++) {
-            arr[59100+i] = 'C'; //changes last ten A's to C
-            arr[55200+i] = 'D'; //changes last ten B's to D
+            arr[59100 + i] = 'C'; //changes last ten A's to C
+            arr[55200 + i] = 'D'; //changes last ten B's to D
         }
-        printf("SON: %s\n",&arr[59100]); // should print AAAAA..CCC...
-        printf("SON: %s\n",&arr[55200]); // should print BBBBB..DDD...
+        printf("SON: %s\n", &arr[59100]); // should print AAAAA..CCC...
+        printf("SON: %s\n", &arr[55200]); // should print BBBBB..DDD...
         printf("\n");
         free(arr);
         exit(0);
     } else { //is parent
         wait(0);
-        printf("PARENT: %s\n",&arr[59100]); // should print AAAAA...
-        printf("PARENT: %s\n",&arr[55200]); // should print BBBBB...
+        printf("PARENT: %s\n", &arr[59100]); // should print AAAAA...
+        printf("PARENT: %s\n", &arr[55200]); // should print BBBBB...
         free(arr);
     }
 }
 
 
 static unsigned long int next = 1;
+
 int getRandNum() {
     next = next * 1103515245 + 12341;
-    return (unsigned int)(next/65536) % ARR_SIZE;
+    return (unsigned int) (next / 65536) % ARR_SIZE;
 }
 
 #define PAGE_NUM(addr) ((uint)(addr) & ~0xFFF)
 #define TEST_POOL 500
+
 /*
 Global Test:
 Allocates 17 pages (1 code, 1 space, 1 stack, 14 malloc)
@@ -66,25 +68,25 @@ LIFO: 42 Page faults
 LAP: 18 Page faults
 SCFIFO: 35 Page faults
 */
-void globalTest(){
-    char * arr;
+void globalTest() {
+    char *arr;
     int i;
     int randNum;
     arr = malloc(ARR_SIZE); //allocates 14 pages (sums to 17 - to allow more then one swapping in scfifo)
     for (i = 0; i < TEST_POOL; i++) {
-        randNum = getRandNum();	//generates a pseudo random number between 0 and ARR_SIZE
-        while (PGSIZE*10-8 < randNum && randNum < PGSIZE*10+PGSIZE/2-8)
+        randNum = getRandNum();    //generates a pseudo random number between 0 and ARR_SIZE
+        while (PGSIZE * 10 - 8 < randNum && randNum < PGSIZE * 10 + PGSIZE / 2 - 8)
             randNum = getRandNum(); // gives page #13 50% less chance of being selected
         //(redraw number if randNum is in the first half of page #13)
-        arr[randNum] = 'X';				// write to memory
+        arr[randNum] = 'X';                // write to memory
     }
     free(arr);
-    printf("Num of page faults: %d \n",page_fault_num());
+    printf("Num of page faults: %d \n", page_fault_num());
 }
 
 
-int main(int argc, char *argv[]){
-    globalTest();			//for testing each policy efficiency
+int main(int argc, char *argv[]) {
+    globalTest();            //for testing each policy efficiency
 //    forkTest();			//for testing swapping machanism in fork.
     exit(0);
 }

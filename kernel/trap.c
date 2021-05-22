@@ -64,7 +64,6 @@ usertrap(void) {
         syscall();
     } else if ((which_dev = devintr()) != 0) {
         // ok
-        // todo: IS THE COMPARISON IS OK?
     } else if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15)){
 //        printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
         if(page_in_file(r_stval(), p->pagetable)){
