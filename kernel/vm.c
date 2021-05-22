@@ -133,7 +133,6 @@ int
 mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm) {
     uint64 a, last;
     pte_t *pte;
-
     a = PGROUNDDOWN(va);
     last = PGROUNDDOWN(va + size - 1);
     for (;;) {
@@ -236,19 +235,21 @@ void swap(pagetable_t pagetable, uint64 user_page_va) {
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 uint64
 uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
+    struct proc *p = myproc();
     char *mem;
     uint64 a;
     if (newsz < oldsz)
         return oldsz;
     if (!is_none_policy()){
-        if (PGROUNDUP(newsz) / PGSIZE > MAX_TOTAL_PAGES && myproc()->pid > 2) {
-            printf("PID: %d try to kalloc: %d pages total is: %d more then 32\n",myproc()->pid,
-                   PGROUNDUP(newsz - oldsz)/PGSIZE, PGROUNDUP(newsz)/PGSIZE);
+        if (PGROUNDUP(newsz) / PGSIZE > MAX_TOTAL_PAGES && p->pid > 2) {
+            printf("PID: %d inisde uvmalloc() try to kalloc: %d pages total is: %d more then 32\n",p->pid,
+                   PGROUNDUP(newsz - oldsz)/PGSIZE - 4, PGROUNDUP(newsz)/PGSIZE - 4);
+            printf("Prock is too big\n");
             return 0;
         }
-        else if (myproc()->pid >= 1){
-            printf("PID: %d inisde uvmalloc()  proc have: %d pages\n",myproc()->pid,PGROUNDUP(oldsz)/PGSIZE);
-            printf("PID: %d inisde uvmalloc() proc try to malloc total: %d pages\n",myproc()->pid, PGROUNDUP(newsz - oldsz)/PGSIZE);
+        else if (myproc()->pid > 2){
+            printf("PID: %d inisde uvmalloc()  proc have: %d pages\n",p->pid,PGROUNDUP(oldsz)/PGSIZE);
+            printf("PID: %d inisde uvmalloc() proc try to malloc: %d new pages\n",p->pid, PGROUNDUP(newsz - oldsz)/PGSIZE);
         }
     }
     oldsz = PGROUNDUP(oldsz);
@@ -266,11 +267,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
-        if(myproc()->pid > 2 && !is_none_policy()){
+        if(p->pid > 2 && !is_none_policy()){
             // no more space in memory need to swap
-            // TODO: DECIDE IF REMOVE THIS +4 CONST
-            if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES){
-                printf("inisde uvmalloc() goign to swap new page num: %d\n",num_of_new_page);
+            // TODO: +4 since the proc have 4 kernel pages that we do not swap or count
+            if((PGROUNDUP(oldsz) / PGSIZE) + num_of_new_page > MAX_PYSC_PAGES + 4){
+                // no space in memory
+                printf("uvmalloc():no space in memory going to swap for new page num: %d\n",num_of_new_page);
                 swap(pagetable,a);
             }
             // have space in memory
@@ -495,24 +497,24 @@ void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     uint64 *pte = walk(pagetable, user_page_va,0);
     if (!pte)
         panic("PTE of swapped out page is missing\n");
-    *pte |= PTE_PG; // turn on Paged out to storage bit
-    *pte &= ~PTE_V; // turn off accessed bit
+    // TODO: shoult it be pte = PTE_FLAGS(*pte) or pte &= PTE_FLAGS(*pte)
     *pte &= PTE_FLAGS(*pte); // clear junk physical address
+    *pte |= PTE_PG; // turn on Paged out to storage bit
+    *pte &= ~PTE_V; // turn off valid bit
     sfence_vma(); //flush the TLB
 }
 
 void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa) {
-    printf("inside update_page_in_pte(): page_pa: %p\n",page_pa);
+//    printf("inside update_page_in_pte(): page_pa: %p\n",page_pa);
     uint64 *pte = walk(pagetable, user_page_va,0);
     if (!pte)
         panic("PTE of swapped in page is missing\n");
     if (*pte & PTE_V)
         panic("in update_paged_in_flags page is Valid!\n");
-    printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
-//    *pte |= page_pa; // copy the physical page number
-    *pte |= PA2PTE(page_pa); // copy the physical page number
-    printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
-    *pte |= PTE_V | PTE_W | PTE_U;      // Turn on needed bits
+//    printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
+    *pte = PA2PTE(page_pa); // Map PTE to the new_page
+//    printf("inside update_page_in_pte(): pte AFTER copy pa: %p\n",*pte);
+    *pte |= PTE_W | PTE_X | PTE_R | PTE_U | PTE_V;      // Turn on needed flags
     *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
 //   if(*pte & PTE_V && *pte & PTE_W && *pte & PTE_U  && !(*pte & PTE_PG) ){
 //       printf("inside update_page_in_pte() ALL FLAGS ARE ON\n");
@@ -530,6 +532,7 @@ void update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     p->memory_pages[free_index].page_order = p->page_order_counter++;
 //    p->memory_pages[free_index].accessCount = 0;
     p->pages_in_memory_counter++;
+    printf("PID: %d inside update_memory_page_metadata() added new page addr: %p num of page in mem: %d\n",p->pid,user_page_va,p->pages_in_memory_counter);
 }
 static char buff[PGSIZE];
 
@@ -545,20 +548,17 @@ int get_page_from_file(uint64 r_stval) {
     // clean the new page
     memset(new_page, 0, PGSIZE);
     int free_index = get_free_memory_page_index();
-    // TODO: should we flush TLB here?
-//    sfence_vma(); //flush the TLB
     // have free space in the memory
     if (free_index >= 0) {
         update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page);
         // TODO: DO WE NEED TO check if read_page_from_file succeed
-//        uint64 user_page_pa = walkaddr(p->pagetable, user_page_va);
         read_page_from_file(p, free_index, user_page_va, buff);
         memmove(new_page, buff,PGSIZE);
         // page not found in file
         return 1;
     }
     // else memory is full & swapping is needed
-    printf("inisde get_page_from_file() - there is no space in memory going to swap\n");
+//    printf("inisde get_page_from_file() - there is no space in memory going to swap\n");
     int out_index = get_swap_out_page_index(); // select page to swap to file
     struct page_metadata_struct out_page = p->memory_pages[out_index];
     // write page to file
@@ -573,21 +573,21 @@ int get_page_from_file(uint64 r_stval) {
 //    uint64 user_page_pa = walkaddr(p->pagetable, user_page_va);
     read_page_from_file(p, out_index, user_page_va, buff);
     memmove(new_page, buff,PGSIZE);
-    printf("inisde get_page_from_file() - FINISHE to swap\n");
+//    printf("inisde get_page_from_file() - FINISHE to swap\n");
     return 1;
 }
 
 int page_in_file(uint64 user_page_va, pagetable_t pagetable){
-    printf("inside page_in_file() the recived VA is: %p\n",user_page_va);
-    printf("Num of pages in file: %d\n",myproc()->pages_in_file_counter);
+//    printf("inside page_in_file() the recived VA is: %p\n",user_page_va);
+//    printf("Num of pages in file: %d\n",myproc()->pages_in_file_counter);
     // for debugging only print all addresses in file
-    for(int i = 0; i <MAX_TOTAL_PAGES-MAX_PYSC_PAGES; i++){
-        if(myproc()->file_pages[i].state == P_USED)
-            printf("THE %d ADDERS IS: %p\n",i,myproc()->file_pages[i].user_page_VA);
-    }
+//    for(int i = 0; i <MAX_TOTAL_PAGES-MAX_PYSC_PAGES; i++){
+//        if(myproc()->file_pages[i].state == P_USED)
+//            printf("THE %d ADDERS IS: %p\n",i,myproc()->file_pages[i].user_page_VA);
+//    }
     pte_t *pte = walk(pagetable,user_page_va,0);
     int found = (*pte & PTE_PG); // if return 1 page is in file
-    printf("inside page_in_file() found: %d\n",found);
+//    printf("inside page_in_file() found: %d\n",found);
     return found;
 }
 
