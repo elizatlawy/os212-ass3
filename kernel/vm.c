@@ -652,13 +652,12 @@ uint num_of_ones (uint access_count) {
 #ifdef SCFIFO
 // Second Chance FIFO - Page Replacement Algorithm
 int SCFIFO_algorithm() {
-
     struct proc *p = myproc();
     int page_index;
     uint64 page_order;
     recheck:
     page_index = -1;
-    page_order = -1;
+    page_order = 0xFFFFFFFF;
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= page_order) {
             page_index = i;
