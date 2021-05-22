@@ -167,16 +167,6 @@ freeproc(struct proc *p) {
     p->chan = 0;
     p->killed = 0;
     p->xstate = 0;
-    if(p->pid > 2){
-        for (int i = 0; i < MAX_PYSC_PAGES; i++)
-            p->memory_pages[i].state = P_UNUSED;
-        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++)
-            p->file_pages[i].state = P_UNUSED;
-    }
-    p->page_order_counter = 0;
-    p->pages_in_file_counter = 0;
-    p->pages_in_memory_counter = 0;
-    p->page_fault_counter = 0;
     p->state = UNUSED;
 }
 
@@ -390,7 +380,25 @@ exit(int status) {
     wakeup(p->parent);
 
     acquire(&p->lock);
+    if(!is_none_policy() && p->pid > 2){
+        for (int i = 0; i < MAX_PYSC_PAGES; i++){
+            p->memory_pages[i].state = P_UNUSED;
+            p->memory_pages[i].pagetable = 0;
+            p->memory_pages[i].user_page_VA = 0;
+            p->memory_pages[i].page_order = 0;
 
+        }
+        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++){
+            p->file_pages[i].state = P_UNUSED;
+            p->file_pages[i].pagetable = 0;
+            p->file_pages[i].user_page_VA = 0;
+            p->file_pages[i].page_order = 0;
+        }
+    }
+    p->page_order_counter = 0;
+    p->pages_in_file_counter = 0;
+    p->pages_in_memory_counter = 0;
+    p->page_fault_counter = 0;
     p->xstate = status;
     p->state = ZOMBIE;
 

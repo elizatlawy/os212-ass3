@@ -109,7 +109,7 @@ walkaddr(pagetable_t pagetable, uint64 va) {
     if (pte == 0)
         return 0;
     if((*pte & PTE_PG) != 0)
-        panic("walkaddr(): pte PTE_PG is on");
+        printf("walkaddr(): pte PTE_PG is on\n");
     if ((*pte & PTE_V) == 0)
         return 0;
     if ((*pte & PTE_U) == 0)
@@ -165,7 +165,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) {
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
         if ((pte = walk(pagetable, a, 0)) == 0)
             panic("uvmunmap: walk");
-        // TODO: add check if the pte is also PTE_PG - is it ok? need to check if there are memory leaks
+        // TODO: add check if the pte is also bot PTE_PG
         if ((*pte & PTE_V) == 0 && (*pte & PTE_PG) == 0)
             panic("uvmunmap: not mapped");
         if (PTE_FLAGS(*pte) == PTE_V)
@@ -265,7 +265,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             return 0;
         }
         if (p->pid > 2 && !is_none_policy() && p->pagetable == pagetable) {
-            if (p->pages_in_memory_counter + p->pages_in_file_counter >= MAX_TOTAL_PAGES) {
+            if (p->pages_in_memory_counter + p->pages_in_file_counter > MAX_TOTAL_PAGES) {
                 printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
                 panic("Prock is too big\n");
             }
@@ -510,9 +510,6 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
 //    printf("inside update_page_in_pte(): pte AFTER copy pa: %p\n",*pte);
     *pte |= PTE_W | PTE_X | PTE_R | PTE_U | PTE_V;      // Turn on needed flags
     *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
-   if(*pte & PTE_V && *pte & PTE_W && *pte & PTE_U  && !(*pte & PTE_PG) ){
-       printf("inside update_page_in_pte() ALL FLAGS ARE ON\n");
-   }
     sfence_vma(); // flush the TLB
 
 }
@@ -560,7 +557,8 @@ int get_page_from_file(uint64 r_stval) {
     write_page_to_file(p, out_page.user_page_VA, out_page.pagetable);
     uint64 out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
     // free physical memory
-    kfree((void *) out_page_pa); // free swapped page
+    if(out_page_pa != 0)
+        kfree((void *) out_page_pa); // free swapped page
     // free pte & restore flags
     update_page_out_pte(out_page.pagetable, out_page.user_page_VA);
     // insert new page into memory
