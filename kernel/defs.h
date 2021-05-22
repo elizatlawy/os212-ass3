@@ -187,7 +187,7 @@ int             get_page_from_file(uint64 r_stval);
 int             page_in_file(uint64 user_page_va, pagetable_t pagetable);
 void            update_page_out_pte(pagetable_t pagetable, uint64 user_page_va);
 void            update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa);
-void            update_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va);
+void            add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va);
 int             get_swap_out_page_index();
 void            update_access_counter(struct proc *p);
 uint            num_of_ones(uint access_count);

@@ -4,6 +4,8 @@
 #include "kernel/syscall.h"
 #include "kernel/param.h"
 
+void page_fault_test();
+
 void fork_test(){
     int child_pid = fork();
     if (child_pid < 0) {
@@ -11,11 +13,13 @@ void fork_test(){
     }
     else if (child_pid > 0) { // father
         printf("new child PID is: %d\n", child_pid);
+        page_fault_test();
         int status;
         wait(&status);
         printf("Child PID: %d exit with status: %d\n",child_pid, status);
     } else { // child
         printf("new child created\n");
+        page_fault_test();
     }
 }
 //#define ARR_SIZE 85000
@@ -42,5 +46,6 @@ void page_fault_test(){
 
 int main(int argc, char *argv[]) {
     page_fault_test();
+//    fork_test();
     exit(0);
 }

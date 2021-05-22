@@ -66,10 +66,12 @@ usertrap(void) {
     } else if ((which_dev = devintr()) != 0) {
         // ok
     } else if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)){
-        printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
+        //printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
+    } else if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15)){
+//        printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
         if(page_in_file(r_stval(), p->pagetable)){
             get_page_from_file(r_stval());
-            printf("PID: %d inside usertrap(): got page:  from file\n", p->pid);
+//            printf("PID: %d inside usertrap(): got page:  from file\n", p->pid);
         }
         else{
             printf("PID: %d inside usertrap(): page: %p is not in file\n", p->pid,r_stval());
@@ -154,11 +156,11 @@ kerneltrap() {
         panic("kerneltrap: interrupts enabled");
 
     if ((which_dev = devintr()) == 0) {
-        if (p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)) {
-            printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
+        if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15 )) {
+//            printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
             if (page_in_file(r_stval(), p->pagetable)){
                 get_page_from_file(r_stval());
-                printf("PID: %d inside kerneltrap(): got page: %p from file\n", p->pid, r_stval());
+//                printf("PID: %d inside kerneltrap(): got page: %p from file\n", p->pid, r_stval());
             }
             else{
                 printf("PID: %d inside kerneltrap() page is not in file\n", p->pid);
