@@ -109,7 +109,7 @@ walkaddr(pagetable_t pagetable, uint64 va) {
     if (pte == 0)
         return 0;
     if((*pte & PTE_PG) != 0)
-        printf("walkaddr(): pte PTE_PG is on\n");
+        panic("walkaddr(): pte PTE_PG is on\n");
     if ((*pte & PTE_V) == 0)
         return 0;
     if ((*pte & PTE_U) == 0)
@@ -554,22 +554,25 @@ int get_page_from_file(uint64 r_stval) {
         memmove(new_page, buff, PGSIZE);
         return 1;
     }
-// else memory is full & swapping is needed
-    int out_index = get_swap_out_page_index(); // select page to swap to file
-    struct page_metadata_struct out_page = p->memory_pages[out_index];
-    // write page to file
-    write_page_to_file(p, out_page.user_page_VA, out_page.pagetable);
-    uint64 out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
-    // free physical memory
-    if(out_page_pa != 0)
+    // else memory is full & swapping is needed
+    else{
+        int out_index = get_swap_out_page_index(); // select page to swap to file
+        struct page_metadata_struct out_page = p->memory_pages[out_index];
+        // insert new page into memory
+        update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page);
+        read_page_from_file(p, out_index, user_page_va, buff);
+        memmove(new_page, buff, PGSIZE);
+        // write page to file
+        uint64 out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
+        write_page_to_file(p, out_page.user_page_VA, out_page.pagetable);
+        update_page_out_pte(out_page.pagetable, out_page.user_page_VA);
+        // free physical memory
         kfree((void *) out_page_pa); // free swapped page
-    // free pte & restore flags
-    update_page_out_pte(out_page.pagetable, out_page.user_page_VA);
-    // insert new page into memory
-    update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page);
-    read_page_from_file(p, out_index, user_page_va, buff);
-    memmove(new_page, buff, PGSIZE);
-    return 1;
+        // free pte & restore flags
+
+
+        return 1;
+    }
 }
 
 int page_in_file(uint64 user_page_va, pagetable_t pagetable) {
