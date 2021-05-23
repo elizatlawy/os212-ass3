@@ -189,7 +189,7 @@ void            update_page_out_pte(pagetable_t pagetable, uint64 user_page_va);
 void            update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa, int index);
 void            add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va);
 int             get_swap_out_page_index();
-void            update_access_counter();
+void            update_access_counter(struct proc*);
 uint            num_of_ones(uint access_count);
 int             is_none_policy();
 void            remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable);

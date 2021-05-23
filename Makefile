@@ -143,6 +143,7 @@ UPROGS=\
 	$U/_sanity\
 	$U/_dolavtest\
 	$U/_tests2\
+	$U/_test3\
 
 
 fs.img: mkfs/mkfs README $(UPROGS)

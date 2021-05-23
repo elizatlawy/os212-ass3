@@ -826,7 +826,7 @@ int write_page_to_file(struct proc *p, uint64 user_page_VA, pagetable_t pagetabl
     p->file_pages[free_index].page_order = 0;
     p->pages_in_file_counter++;
     p->pages_in_memory_counter--;
-    printf("PID: %d in write_page_to_file(): added page addr: %p to file\n",p->pid,user_page_VA);
+//    printf("PID: %d in write_page_to_file(): added page addr: %p to file\n",p->pid,user_page_VA);
     return result;
 }
 
@@ -843,7 +843,7 @@ int read_page_from_file(struct proc *p, int memory_index, uint64 user_page_VA, c
             p->file_pages[i].state = P_UNUSED;
             p->pages_in_file_counter--;
             p->pages_in_memory_counter++;
-            printf("PID: %d in read_page_from_file(): added page addr: %p to ram\n",p->pid,user_page_VA);
+//            printf("PID: %d in read_page_from_file(): added page addr: %p to ram\n",p->pid,user_page_VA);
             return result;
         }
     }

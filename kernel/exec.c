@@ -39,7 +39,7 @@ exec(char *path, char **argv) {
 
 
 
-    if (!is_none_policy() && p->pid > 2) {
+    if (!is_none_policy()) {
         if (myproc()->swapFile)
             // delete parent copied swapFile
             removeSwapFile(myproc());
@@ -139,7 +139,6 @@ exec(char *path, char **argv) {
     p->trapframe->epc = elf.entry;  // initial program counter = main
     p->trapframe->sp = sp; // initial stack pointer
     proc_freepagetable(oldpagetable, oldsz);
-
     return argc; // this ends up in a0, the first argument to main(argc, argv)
 
     bad:

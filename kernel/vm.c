@@ -223,7 +223,6 @@ int is_none_policy(){
 
 void swap(pagetable_t pagetable, uint64 user_page_va) {
     struct proc *p = myproc();
-    p->page_fault_counter++;
     // move selected page from memory to swapFile
     int out_index = get_swap_out_page_index();
     uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
@@ -272,19 +271,15 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             }
             if (old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES) {
                 // no more space in memory need to swap
-                printf("uvmalloc(): no space in memory going to swap for new page num: %d\n", num_of_new_page);
+//                printf("pid: %d  uvmalloc(): no space in memory going to swap for new page num: %d\n",p->pid, num_of_new_page);
                 swap(pagetable, a);
             }
                 // have space in memory
             else {
-//                printf("uvmalloc(): have space in memory update metadata new page num: %d\n", num_of_new_page);
+//                printf("pid: %d uvmalloc(): have space in memory update metadata new page num: %d\n",p->pid, num_of_new_page);
                 add_to_memory_page_metadata(pagetable, a);
             }
         }
-    }
-    for(int i=0;i<16;i++){
-        if(p->memory_pages->state ==P_USED)
-            printf("pid: %d ,page_num: %d, page_addr: %p\n",p->pid, i,p->memory_pages[i].user_page_VA);
     }
     return newsz;
 }
@@ -512,7 +507,7 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
     if (*pte & PTE_V)
         panic("in update_paged_in_flags page is Valid!\n");
 //    printf("inside update_page_in_pte(): pte BEFORE copy pa: %p\n",*pte);
-    *pte = PA2PTE(page_pa); // Map PTE to the new_page
+    *pte |= PA2PTE(page_pa); // Map PTE to the new_page
 //    printf("inside update_page_in_pte(): pte AFTER copy pa: %p\n",*pte);
     *pte |= PTE_W | PTE_X | PTE_R | PTE_U | PTE_V;      // Turn on needed flags
     *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
@@ -524,7 +519,6 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
         struct proc *p = myproc();
         p->memory_pages[index].access_count = 0xFFFFFFFF;
     #endif
-
     sfence_vma(); // flush the TLB
 
 }
@@ -541,7 +535,7 @@ void add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
         p->memory_pages[free_index].access_count = 0;
     #endif
     #ifdef LAPA
-        p->memory_pages[free_index].access_count = 0xFFFFFFFF ;
+        p->memory_pages[free_index].access_count = 0xFFFFFFFF; // -1
     #endif
 }
 static char buff[PGSIZE];
@@ -635,21 +629,21 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
 
 //#if defined(NFUA) || defined(LAPA)
 // Updates the access counter in NFUA and LAPA paging policies
-void update_access_counter(){
-
-    struct proc *p = myproc();
-    if(p->pid > 2)
+void update_access_counter(struct proc* p){
+    if(p->pid <= 2)
         return;
+    printf("PID: %d enter update_access_counter()\n",p->pid);
     uint addr = 0x80000000; // 10000000000000000000000000000000 in binary
-
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
             p->memory_pages[i].access_count >>= 1; // Shift-right
             pte_t *pte = walk(p->memory_pages[i].pagetable, p->memory_pages[i].user_page_VA,0);
+//            printf("PID: %d update_access_counter(): pte addr after walk is: %p PTE_A bit: %d \n",p->pid,pte, *pte & PTE_A);
             if (*pte & PTE_A){
                 p->memory_pages[i].access_count |= addr; // add 1 to the most significant bit
                 *pte &= ~PTE_A; // turn off PTE_A flag
                 printf("addr: %p, access_count: %u\n",p->memory_pages[i].user_page_VA,p->memory_pages[i].access_count);
+//                panic("in update_access_counter(): *pte & PTE_A");
             }
         }
     }
@@ -699,8 +693,8 @@ int SCFIFO_algorithm() {
 int NFUA_algorithm(){
     struct proc *p = myproc();
     int page_index = -1;
-    uint best = 4294967295;
-    uint curr = 4294967295;
+    uint best = 0xFFFFFFFF;
+    uint curr = 0xFFFFFFFF;
 //    printf(" curr: %u, best: %u\n",curr,best);
     for(int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
@@ -721,11 +715,10 @@ int NFUA_algorithm(){
 #ifdef LAPA
 // Least Accessed Page With Aging Page Replacement Algorithm
 int LAPA_algorithm(){
-
     struct proc *p = myproc();
     int page_index = -1;
-    uint best = 4294967295;
-    uint curr = 4294967295;
+    uint best = 0xFFFFFFFF;
+    uint curr = 0xFFFFFFFF;
 //    printf(" curr: %u, best: %u\n",curr,best);
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED) {
