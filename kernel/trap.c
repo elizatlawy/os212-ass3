@@ -189,9 +189,9 @@ clockintr() {
     ticks++;
     wakeup(&ticks);
     release(&tickslock);
-    #if defined(NFUA) || defined(LAPA)
-        update_pages_acceess_counter(); //defined in proc.c
-    #endif
+//    #if defined(NFUA) || defined(LAPA)
+//        update_pages_acceess_counter(); //defined in proc.c
+//    #endif
 }
 
 // check if it's an external interrupt or software interrupt,

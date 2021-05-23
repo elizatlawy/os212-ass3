@@ -89,14 +89,14 @@ enum page_metadata_state {
 };
 
 // pages struct
-struct page_metadata_struct {
+struct page_metadata_struct{
     enum page_metadata_state state;
     pagetable_t pagetable;
     uint64 user_page_VA;
     uint page_order;
-    #if defined(NFUA) || defined(LAPA)
-        uint access_count;
-    #endif
+    uint access_count;
+
+
 };
 
 // Per-process state
@@ -130,4 +130,5 @@ struct proc {
     uint64 page_order_counter; // count on load or creation
     uint64 pages_in_file_counter;
     uint64 pages_in_memory_counter;
+
 };

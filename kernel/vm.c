@@ -277,9 +277,14 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             }
                 // have space in memory
             else {
+//                printf("uvmalloc(): have space in memory update metadata new page num: %d\n", num_of_new_page);
                 add_to_memory_page_metadata(pagetable, a);
             }
         }
+    }
+    for(int i=0;i<16;i++){
+        if(p->memory_pages->state ==P_USED)
+            printf("pid: %d ,page_num: %d, page_addr: %p\n",p->pid, i,p->memory_pages[i].user_page_VA);
     }
     return newsz;
 }
@@ -499,7 +504,7 @@ void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     sfence_vma(); //flush the TLB
 }
 
-void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa) {
+void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_pa, int index) {
 //    printf("inside update_page_in_pte(): page_pa: %p\n",page_pa);
     uint64 * pte = walk(pagetable, user_page_va, 0);
     if (!pte)
@@ -511,6 +516,15 @@ void update_page_in_pte(pagetable_t pagetable, uint64 user_page_va, uint64 page_
 //    printf("inside update_page_in_pte(): pte AFTER copy pa: %p\n",*pte);
     *pte |= PTE_W | PTE_X | PTE_R | PTE_U | PTE_V;      // Turn on needed flags
     *pte &= ~PTE_PG; // page is back in memory turn off Paged out bit
+    #ifdef NFUA
+        struct proc *p = myproc();
+        p->memory_pages[index].access_count = 1<<31;
+    #endif
+    #ifdef LAPA
+        struct proc *p = myproc();
+        p->memory_pages[index].access_count = 0xFFFFFFFF;
+    #endif
+
     sfence_vma(); // flush the TLB
 
 }
@@ -527,7 +541,7 @@ void add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
         p->memory_pages[free_index].access_count = 0;
     #endif
     #ifdef LAPA
-        p->memory_pages[free_index].access_count = -1 ; //0xFFFFFFFF
+        p->memory_pages[free_index].access_count = 0xFFFFFFFF ;
     #endif
 }
 static char buff[PGSIZE];
@@ -545,7 +559,7 @@ int get_page_from_file(uint64 r_stval) {
     int free_index = get_free_memory_page_index();
     // have free space in the memory
     if (free_index >= 0) {
-        update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page);
+        update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page, free_index);
         read_page_from_file(p, free_index, user_page_va, buff);
         memmove(new_page, buff, PGSIZE);
         return 1;
@@ -555,7 +569,7 @@ int get_page_from_file(uint64 r_stval) {
         int out_index = get_swap_out_page_index(); // select page to swap to file
         struct page_metadata_struct out_page = p->memory_pages[out_index];
         // insert new page into memory
-        update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page);
+        update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page, out_index);
         read_page_from_file(p, out_index, user_page_va, buff);
         memmove(new_page, buff, PGSIZE);
         // write page to file
@@ -618,24 +632,29 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
     }
 }
 
-#if defined(NFUA) || defined(LAPA)
-// Updates the access counter in NFUA and LAPA paging policies
-void update_access_counter(struct proc * p){
 
-    uint addr = 1 << 31; // 10000000000000000000000000000000 in binary
+//#if defined(NFUA) || defined(LAPA)
+// Updates the access counter in NFUA and LAPA paging policies
+void update_access_counter(){
+
+    struct proc *p = myproc();
+    if(p->pid > 2)
+        return;
+    uint addr = 0x80000000; // 10000000000000000000000000000000 in binary
 
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
-            p->memory_pages[i].access_count <<= 1; // Shift-right
+            p->memory_pages[i].access_count >>= 1; // Shift-right
             pte_t *pte = walk(p->memory_pages[i].pagetable, p->memory_pages[i].user_page_VA,0);
             if (*pte & PTE_A){
                 p->memory_pages[i].access_count |= addr; // add 1 to the most significant bit
                 *pte &= ~PTE_A; // turn off PTE_A flag
+                printf("addr: %p, access_count: %u\n",p->memory_pages[i].user_page_VA,p->memory_pages[i].access_count);
             }
         }
     }
 }
-#endif
+//#endif
 
 #ifdef LAPA
 // Counts the number of turned on bits
@@ -658,7 +677,7 @@ int SCFIFO_algorithm() {
     uint64 page_order;
     recheck:
     page_index = -1;
-    page_order = 0xFFFFFFFF;
+    page_order = 0xffffffff;
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= page_order) {
             page_index = i;
@@ -678,21 +697,23 @@ int SCFIFO_algorithm() {
 #ifdef NFUA
 // Not Frequently Used With Aging Page Replacement Algorithm
 int NFUA_algorithm(){
-
     struct proc *p = myproc();
     int page_index = -1;
-    uint best = -1;
-    uint curr = -1;
-
-    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+    uint best = 4294967295;
+    uint curr = 4294967295;
+//    printf(" curr: %u, best: %u\n",curr,best);
+    for(int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
             curr = p->memory_pages[i].access_count;
+//            printf("pid: %d, curr: %u, best: %u\n",p->pid,curr,best);
             if(curr < best){
+//                printf(" curr<best\n");
                 best = curr;
                 page_index = i;
             }
         }
     }
+    printf("returned page_index: %d\n", page_index);
     return page_index;
 }
 #endif
@@ -703,18 +724,21 @@ int LAPA_algorithm(){
 
     struct proc *p = myproc();
     int page_index = -1;
-    uint best = -1;
-    uint curr = -1;
-
+    uint best = 4294967295;
+    uint curr = 4294967295;
+//    printf(" curr: %u, best: %u\n",curr,best);
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED) {
+//            printf("access_count: %u\n", p->memory_pages[i].access_count);
             curr = num_of_ones(p->memory_pages[i].access_count);
+//            printf("pid: %d,access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
             if(curr < best || (curr == best && p->memory_pages[i].access_count < p->memory_pages[page_index].access_count)){
                 best = curr;
                 page_index = i;
             }
         }
     }
+    printf("returned page_index: %d\n", page_index);
     return page_index;
 }
 #endif

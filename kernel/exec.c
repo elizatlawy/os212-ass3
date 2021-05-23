@@ -45,14 +45,22 @@ exec(char *path, char **argv) {
             removeSwapFile(myproc());
         // create new swapFile
         createSwapFile(myproc());
-        for (int i = 0; i < MAX_PYSC_PAGES; i++)
+        for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             p->memory_pages[i].state = P_UNUSED;
-        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++)
+        #ifdef NFUA
+            p->memory_pages[i].access_count = 0;
+        #endif
+        #ifdef LAPA
+            p->memory_pages[i].access_count = 0xFFFFFFFF ; // -1
+        #endif
+        }
+        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
             p->file_pages[i].state = P_UNUSED;
-        p->page_order_counter = 0;
-        p->pages_in_file_counter = 0;
-        p->pages_in_memory_counter = 0;
-        p->page_fault_counter = 0;
+            p->page_order_counter = 0;
+            p->pages_in_file_counter = 0;
+            p->pages_in_memory_counter = 0;
+            p->page_fault_counter = 0;
+        }
     }
     // Load program into memory.
     for (i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph)) {
