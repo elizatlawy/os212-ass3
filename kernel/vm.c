@@ -108,14 +108,14 @@ walkaddr(pagetable_t pagetable, uint64 va) {
     pte = walk(pagetable, va, 0);
     if (pte == 0)
         return 0;
-    if((*pte & PTE_PG) != 0)
+    if ((*pte & PTE_PG) != 0)
         panic("walkaddr(): pte PTE_PG is on\n");
     if ((*pte & PTE_V) == 0)
         return 0;
     if ((*pte & PTE_U) == 0)
         return 0;
     pa = PTE2PA(*pte);
-    if(pa == 0)
+    if (pa == 0)
         printf(" walkaddr(): pa == 0\n");
     return pa;
 }
@@ -223,6 +223,7 @@ int is_none_policy(){
 
 void swap(pagetable_t pagetable, uint64 user_page_va) {
     struct proc *p = myproc();
+    p->page_fault_counter++;
     // move selected page from memory to swapFile
     int out_index = get_swap_out_page_index();
     uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
@@ -265,7 +266,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             return 0;
         }
         if (p->pid > 2 && !is_none_policy() && p->pagetable == pagetable) {
-            if (p->pages_in_memory_counter + p->pages_in_file_counter > MAX_TOTAL_PAGES) {
+            if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
                 printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
                 panic("Prock is too big\n");
             }
@@ -533,7 +534,6 @@ static char buff[PGSIZE];
 
 int get_page_from_file(uint64 r_stval) {
     struct proc *p = myproc();
-    p->page_order_counter++;
     p->page_fault_counter++;
     uint64 user_page_va = PGROUNDDOWN(r_stval);
     char *new_page = kalloc();
@@ -550,8 +550,8 @@ int get_page_from_file(uint64 r_stval) {
         memmove(new_page, buff, PGSIZE);
         return 1;
     }
-    // else memory is full & swapping is needed
-    else{
+        // else memory is full & swapping is needed
+    else {
         int out_index = get_swap_out_page_index(); // select page to swap to file
         struct page_metadata_struct out_page = p->memory_pages[out_index];
         // insert new page into memory
