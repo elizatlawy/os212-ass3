@@ -632,7 +632,6 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
 void update_access_counter(struct proc* p){
     if(p->pid <= 2)
         return;
-    printf("PID: %d enter update_access_counter()\n",p->pid);
     uint addr = 0x80000000; // 10000000000000000000000000000000 in binary
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
@@ -642,8 +641,7 @@ void update_access_counter(struct proc* p){
             if (*pte & PTE_A){
                 p->memory_pages[i].access_count |= addr; // add 1 to the most significant bit
                 *pte &= ~PTE_A; // turn off PTE_A flag
-                printf("addr: %p, access_count: %u\n",p->memory_pages[i].user_page_VA,p->memory_pages[i].access_count);
-//                panic("in update_access_counter(): *pte & PTE_A");
+//                printf("PID: update_access_counter(): %d addr: %p, access_count: %u\n",p->pid, p->memory_pages[i].user_page_VA,p->memory_pages[i].access_count);
             }
         }
     }
