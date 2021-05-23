@@ -605,9 +605,9 @@ void remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable) {
             #if defined(NFUA) || defined(LAPA)
                 p->memory_pages[i].access_count = 0;
             #endif
-            printf("PID: %d remove_from_memory_meta_data(): p->pages_in_memory_counter: %d\n", p->pid,
-                   p->pages_in_memory_counter);
-            printf("Removed addr: %p\n", user_page_va);
+//            printf("PID: %d remove_from_memory_meta_data(): p->pages_in_memory_counter: %d\n", p->pid,
+//                   p->pages_in_memory_counter);
+//            printf("Removed addr: %p\n", user_page_va);
             return;
         }
     }
@@ -705,7 +705,7 @@ int NFUA_algorithm(){
             }
         }
     }
-    printf("returned page_index: %d\n", page_index);
+//    printf("returned page_index: %d\n", page_index);
     return page_index;
 }
 #endif
