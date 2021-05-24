@@ -6,22 +6,22 @@
 
 void page_fault_test();
 
-//void fork_test(){
-//    int child_pid = fork();
-//    if (child_pid < 0) {
-//        printf("fork failed\n");
-//    }
-//    else if (child_pid > 0) { // father
-//        printf("new child PID is: %d\n", child_pid);
+void fork_test(){
+    page_fault_test();
+    int child_pid = fork();
+    if (child_pid < 0) {
+        printf("fork failed\n");
+    }
+    else if (child_pid > 0) { // father
+        printf("new child PID is: %d\n", child_pid);
+        int status;
+        wait(&status);
+        printf("Child PID: %d exit with status: %d\n",child_pid, status);
+    } else { // child
+        printf("new child created\n");
 //        page_fault_test();
-//        int status;
-//        wait(&status);
-//        printf("Child PID: %d exit with status: %d\n",child_pid, status);
-//    } else { // child
-//        printf("new child created\n");
-//        page_fault_test();
-//    }
-//}
+    }
+}
 //#define ARR_SIZE 85000
 // num of page fault with ARR_SIZE 85000 is: 41
 #define ARR_SIZE 70000 // 18 pages
@@ -46,7 +46,27 @@ void page_fault_test(){
     printf("Num of page faults: %d \n",page_fault_num());
 }
 
+#define PGSIZE 4096
+#define pages_num 17
+
+void simple_test(){
+    char * memory_arr[pages_num];
+    for(int i = 0; i < 17; i++){
+        memory_arr[i] = malloc(PGSIZE);
+    }
+    for (int i = 100; i < 120; i++)
+    {
+        *memory_arr[(i % 3)] = i;
+        printf("*memory_arr[%d] was accessed in tick %d\n", i % 3, uptime());
+    }
+    free(memory_arr);
+    printf("Num of page faults: %d \n",page_fault_num());
+}
+
+
 int main(int argc, char *argv[]) {
-    page_fault_test();
+//    fork_test();
+//    page_fault_test();
+    simple_test();
     exit(0);
 }

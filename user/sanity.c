@@ -5,8 +5,8 @@
 
 #define PGSIZE 4096
 //#define ARR_SIZE 55000
-#define ARR_SIZE 74096 // arr with size of 19 pages
-
+//#define ARR_SIZE 74096 // arr with size of 19 pages
+#define ARR_SIZE 59096 // arr with 14 pages
 /*
 	Test used to check the swapping machanism in fork.
 	Best tested when LIFO is used (for more swaps)
@@ -67,6 +67,12 @@ Results (for TEST_POOL = 500):
 LIFO: 42 Page faults
 LAP: 18 Page faults
 SCFIFO: 35 Page faults
+
+ // our results:
+ SCFIFO:
+ NFUA:
+ LAPA:
+
 */
 void globalTest() {
     char *arr;

@@ -328,6 +328,9 @@ fork(void) {
     np->state = RUNNABLE;
     release(&np->lock);
 
+//    printf("pid: %d in fork(): just before return\n", p->pid);
+//    print_memory_metadata_state(p);
+
     return pid;
 }
 
@@ -386,12 +389,14 @@ exit(int status) {
             p->memory_pages[i].pagetable = 0;
             p->memory_pages[i].user_page_VA = 0;
             p->memory_pages[i].page_order = 0;
+            p->memory_pages[i].access_count = 0;
         }
         for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++){
             p->file_pages[i].state = P_UNUSED;
             p->file_pages[i].pagetable = 0;
             p->file_pages[i].user_page_VA = 0;
             p->file_pages[i].page_order = 0;
+            p->file_pages[i].access_count = 0;
         }
     }
     p->page_order_counter = 0;

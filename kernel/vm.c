@@ -600,11 +600,10 @@ void remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable) {
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED && p->memory_pages[i].user_page_VA == user_page_va &&
             p->memory_pages[i].pagetable == pagetable) {
-            p->memory_pages[i].state = P_UNUSED;
+            p->memory_pages[i].access_count = 0;
+            p->memory_pages[i].page_order = 0;
             p->pages_in_memory_counter--;
-            #if defined(NFUA) || defined(LAPA)
-                p->memory_pages[i].access_count = 0;
-            #endif
+            p->memory_pages[i].state = P_UNUSED;
 //            printf("PID: %d remove_from_memory_meta_data(): p->pages_in_memory_counter: %d\n", p->pid,
 //                   p->pages_in_memory_counter);
 //            printf("Removed addr: %p\n", user_page_va);
@@ -619,8 +618,10 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
         if (p->file_pages[i].state == P_USED
             && p->file_pages[i].user_page_VA == user_page_va
             && p->file_pages[i].pagetable == pagetable) {
-            p->file_pages[i].state = P_UNUSED;
+            p->file_pages[i].access_count = 0;
+            p->file_pages[i].page_order = 0;
             p->pages_in_file_counter--;
+            p->file_pages[i].state = P_UNUSED;
             return;
         }
     }
@@ -697,9 +698,8 @@ int NFUA_algorithm(){
     for(int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
             curr = p->memory_pages[i].access_count;
-//            printf("pid: %d, curr: %u, best: %u\n",p->pid,curr,best);
             if(curr < best){
-//                printf(" curr<best\n");
+            printf("pid: %d in NFUA_algorithm(): access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
                 best = curr;
                 page_index = i;
             }
@@ -722,7 +722,7 @@ int LAPA_algorithm(){
         if (p->memory_pages[i].state == P_USED) {
 //            printf("access_count: %u\n", p->memory_pages[i].access_count);
             curr = num_of_ones(p->memory_pages[i].access_count);
-//            printf("pid: %d,access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
+            printf("pid: %d,access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
             if(curr < best || (curr == best && p->memory_pages[i].access_count < p->memory_pages[page_index].access_count)){
                 best = curr;
                 page_index = i;
@@ -735,7 +735,6 @@ int LAPA_algorithm(){
 #endif
 
 int get_swap_out_page_index() {
-
     #ifdef SCFIFO
         return SCFIFO_algorithm();
     #endif
@@ -746,6 +745,37 @@ int get_swap_out_page_index() {
         return NFUA_algorithm();
     #endif
     panic("Unrecognized paging machanism");
+}
+
+void print_memory_metadata_state(struct proc *p){
+    if(p->pid > 2){
+        for(int i = 0; i < 16; i++){
+            if(p->memory_pages[i].state == P_USED){
+                printf("memory page num: %d, state is P_USED\n",i);
+                printf("user_page_VA: %p, access_count: %u page_order: %d \n",
+                       p->memory_pages[i].user_page_VA,p->memory_pages[i].access_count,p->memory_pages[i].page_order);
+
+            }
+            else if (p->memory_pages[i].state == P_UNUSED){
+                printf("memory page num: %d, state is P_UNUSED\n",i);
+                printf("user_page_VA: %p, access_count: %u page_order: %d \n",
+                       p->memory_pages[i].user_page_VA,p->memory_pages[i].access_count,p->memory_pages[i].page_order);
+            }
+        }
+        for(int i = 0; i < 16; i++){
+            if(p->file_pages[i].state == P_USED){
+                printf("FILE page num: %d, state is P_USED\n",i);
+                printf("user_page_VA: %p, access_count: %u, page_order: %d \n",
+                       p->file_pages[i].user_page_VA,p->file_pages[i].access_count,p->file_pages[i].page_order);
+            }
+            else if (p->file_pages[i].state == P_UNUSED){
+                printf("FILE page num: %d, state is P_UNUSED\n",i);
+                printf("user_page_VA: %p, access_count: %u, page_order: %d \n",
+                       p->file_pages[i].user_page_VA,p->file_pages[i].access_count,p->file_pages[i].page_order);
+
+            }
+        }
+    }
 }
 
 

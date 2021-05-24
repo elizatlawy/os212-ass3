@@ -197,6 +197,7 @@ void            remove_from_file_meta_data(uint64 user_page_va, pagetable_t page
 int             SCFIFO_algorithm();
 int             LAPA_algorithm();
 int             NFUA_algorithm();
+void            print_memory_metadata_state(struct proc *p);
 
 // plic.c
 void            plicinit(void);
