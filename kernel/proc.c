@@ -354,7 +354,8 @@ reparent(struct proc *p) {
 void
 exit(int status) {
     struct proc *p = myproc();
-
+    printf("exit(): before cleaning the proc\n");
+    print_memory_metadata_state(p);
     if (p == initproc)
         panic("init exiting");
 

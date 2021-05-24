@@ -291,6 +291,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         if (p->pid > 2 && !is_none_policy()){
             if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
                 printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
+                print_memory_metadata_state(p);
                 panic("Prock is too big\n");
             }
             if (old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES) {
@@ -320,7 +321,6 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
 
     if (PGROUNDUP(newsz) < PGROUNDUP(oldsz)) {
         int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
-
         uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
     }
 
@@ -517,7 +517,7 @@ void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     if (!pte)
         panic("PTE of swapped out page is missing\n");
     // TODO: shoult it be pte = PTE_FLAGS(*pte) or pte &= PTE_FLAGS(*pte)
-    *pte &= PTE_FLAGS(*pte); // clear junk physical address
+//    *pte &= PTE_FLAGS(*pte); // clear junk physical address
     *pte |= PTE_PG; // turn on Paged out to storage bit
     *pte &= ~PTE_V; // turn off valid bit
     sfence_vma(); //flush the TLB
@@ -682,12 +682,12 @@ int SCFIFO_algorithm() {
     struct proc *p = myproc();
     int page_index;
     uint64 page_order;
-
     recheck:
     page_index = -1;
     page_order = 0xffffffff;
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= page_order) {
+        if (p->memory_pages[i].state == P_USED &&
+        p->memory_pages[i].user_page_VA != 0x0000000000000000 && p->memory_pages[i].page_order <= page_order) {
             page_index = i;
             page_order = p->memory_pages[i].page_order;
         }
