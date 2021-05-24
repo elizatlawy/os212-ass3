@@ -65,7 +65,7 @@ usertrap(void) {
         syscall();
     } else if ((which_dev = devintr()) != 0) {
         // ok
-    } else if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15)){
+    } else if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12 )){
 //        printf("PID: %d inside usertrap(): got page fault: %d r_stval is: %p\n",p->pid, r_scause(),r_stval());
         if(page_in_file(r_stval(), p->pagetable)){
             get_page_from_file(r_stval());
@@ -75,6 +75,7 @@ usertrap(void) {
             printf("PID: %d inside usertrap(): page: %p is not in file\n", p->pid,r_stval());
             printf("usertrap(): unexpected scause %d pid=%d\n", r_scause(), p->pid);
             printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+//            print_memory_metadata_state(p);
             p->killed = 1;
         }
 
@@ -82,6 +83,7 @@ usertrap(void) {
     else {
         printf("usertrap(): unexpected scause %d pid=%d\n", r_scause(), p->pid);
         printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+//        print_memory_metadata_state(p);
         p->killed = 1;
     }
 
@@ -154,7 +156,7 @@ kerneltrap() {
         panic("kerneltrap: interrupts enabled");
 
     if ((which_dev = devintr()) == 0) {
-        if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15 )) {
+        if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)) {
 //            printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
             if (page_in_file(r_stval(), p->pagetable)){
                 get_page_from_file(r_stval());
@@ -164,6 +166,7 @@ kerneltrap() {
                 printf("PID: %d inside kerneltrap() page is not in file\n", p->pid);
                 printf("scause %d PID: %d\n", scause, p->pid);
                 printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+                print_memory_metadata_state(p);
                 panic("kerneltrap");
             }
         } else {

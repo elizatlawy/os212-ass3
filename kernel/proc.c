@@ -473,7 +473,6 @@ scheduler(void) {
     struct proc *p;
     struct cpu *c = mycpu();
     c->proc = 0;
-    int found = 0;
     for (;;) {
         // Avoid deadlock by ensuring that devices can interrupt.
         intr_on();
@@ -490,13 +489,8 @@ scheduler(void) {
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 c->proc = 0;
-                found = 1;
             }
             release(&p->lock);
-        }
-        if(found == 0) {
-            intr_on();
-            asm volatile("wfi");
         }
     }
 }

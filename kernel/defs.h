@@ -198,6 +198,7 @@ int             SCFIFO_algorithm();
 int             LAPA_algorithm();
 int             NFUA_algorithm();
 void            print_memory_metadata_state(struct proc *p);
+pte_t*         walk(pagetable_t pagetable, uint64 va, int alloc);
 
 // plic.c
 void            plicinit(void);

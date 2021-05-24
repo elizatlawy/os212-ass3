@@ -6,6 +6,7 @@
 
 
 int main(int argc, char *argv[]) {
-    printf("Hello Word\n");
+    int a = 10;
+    printf("Hello Word %d\n",a);
     exit(0);
 }

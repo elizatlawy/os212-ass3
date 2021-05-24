@@ -142,8 +142,13 @@ exec(char *path, char **argv) {
     p->trapframe->sp = sp; // initial stack pointer
     proc_freepagetable(oldpagetable, oldsz);
 
-//    printf("pid: %d in exec(): just before return\n", p->pid);
-//    print_memory_metadata_state(p);
+//    for(uint page = 0; page < PGSIZE*4; page += PGSIZE){
+//        add_to_memory_page_metadata(p->pagetable, page);
+//    }
+
+
+    printf("pid: %d in exec(): just before return\n", p->pid);
+    print_memory_metadata_state(p);
     return argc; // this ends up in a0, the first argument to main(argc, argv)
 
     bad:
