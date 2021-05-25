@@ -288,7 +288,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
-        if (p->pid > 2 && !is_none_policy()){
+        if (p->pid > 2 && !is_none_policy() && p->pagetable == pagetable){
             if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
                 printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
                 print_memory_metadata_state(p);
@@ -569,6 +569,7 @@ int get_page_from_file(uint64 r_stval) {
 //    char* buffer = kalloc();
     struct proc *p = myproc();
     p->page_fault_counter++;
+//    printf("PID: %d get_page_from_file(): page_fault_counter: %d\n",p->pid,p->page_fault_counter);
     uint64 user_page_va = PGROUNDDOWN(r_stval);
     char *new_page = kalloc();
     if (new_page == 0)
@@ -608,7 +609,7 @@ int get_page_from_file(uint64 r_stval) {
 }
 
 int page_in_file(uint64 user_page_va, pagetable_t pagetable) {
-    printf("page_in_file(): user_page_va: %p\n",user_page_va);
+//    printf("page_in_file(): user_page_va: %p\n",user_page_va);
     pte_t *pte = walk(pagetable, user_page_va, 0);
     int found = (*pte & PTE_PG); // if return 1 page is in file
 //    printf("inside page_in_file() found: %d\n",found);
@@ -700,6 +701,7 @@ int SCFIFO_algorithm() {
         p->memory_pages[page_index].page_order = p->page_order_counter++; // put this page to the end of the queue
         goto recheck;
     }
+//    printf("SCFIFO_algorithm(): selected page num: %d addr: %p page order: %d\n",page_index, p->memory_pages[page_index],p->page_order_counter);
     return page_index;
 }
 
@@ -714,7 +716,7 @@ int NFUA_algorithm(){
         if (p->memory_pages[i].state == P_USED){
             curr = p->memory_pages[i].access_count;
             if(curr < best){
-            printf("pid: %d in NFUA_algorithm(): access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
+//            printf("pid: %d in NFUA_algorithm(): access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
                 best = curr;
                 page_index = i;
             }
@@ -735,14 +737,14 @@ int LAPA_algorithm(){
         if (p->memory_pages[i].state == P_USED) {
 //            printf("access_count: %u\n", p->memory_pages[i].access_count);
             curr = num_of_ones(p->memory_pages[i].access_count);
-            printf("pid: %d,access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
+//            printf("pid: %d,access_count: %u, curr: %u, best: %u\n",p->pid,p->memory_pages[i].access_count,curr,best);
             if(curr < best || (curr == best && p->memory_pages[i].access_count < p->memory_pages[page_index].access_count)){
                 best = curr;
                 page_index = i;
             }
         }
     }
-    printf("returned page_index: %d\n", page_index);
+//    printf("returned page_index: %d\n", page_index);
     return page_index;
 }
 

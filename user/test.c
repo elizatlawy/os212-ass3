@@ -29,8 +29,9 @@ void fork_test(){
 //#define ARR_SIZE 70000 // 18 pages
 #define ARR_SIZE 57344 // 14 pages
 
-// SCFIFO:
-//
+// SCFIFO: 12
+// NFUA: 5
+// lapa: 12
 void page_fault_test(){
     char * arr;
     int i;
@@ -81,6 +82,7 @@ void scfifo_test() {
     gets(input, 10);
 
     fprintf(2, "\n\nWe accessed 2 pages and then accessed 2 pages we moved to Swapfile. should be 2 PGFLT - use Ctrl + P followned by Enter");
+//    printf("Num of page faults: %d \n",page_fault_num());
     int j;
     for (j = 3; j < 6; j = j + 2){
         pages[j][1]='T';

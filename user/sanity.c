@@ -4,9 +4,9 @@
 #include "kernel/fs.h"
 
 #define PGSIZE 4096
-//#define ARR_SIZE 55000
+#define ARR_SIZE 55000
 //#define ARR_SIZE 74096 // arr with size of 19 pages
-#define ARR_SIZE 59096 // arr with 15 pages
+//#define ARR_SIZE 59096 // arr with 15 pages
 /*
 	Test used to check the swapping machanism in fork.
 	Best tested when LIFO is used (for more swaps)
@@ -68,10 +68,10 @@ LIFO: 42 Page faults
 LAP: 18 Page faults
 SCFIFO: 35 Page faults
 
- // our results:
- SCFIFO:
- NFUA:
- LAPA:
+ // our results: with ARR_SIZE 55000 - arr with 14 pages
+ SCFIFO: 20
+ NFUA: 8
+ LAPA: 11
 
 */
 void globalTest() {

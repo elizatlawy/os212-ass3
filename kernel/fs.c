@@ -816,7 +816,6 @@ int write_page_to_file(struct proc *p, uint64 user_page_VA, pagetable_t pagetabl
     int free_index = get_free_file_index(p);
     pte_t *pte = walk(pagetable, user_page_VA,0);
     uint64 user_page_pa = PTE2PA(*pte);
-    printf("write_page_to_file(): user_page_pa: %p\n",user_page_pa);
     int result = writeToSwapFile(p, (char *) user_page_pa, PGSIZE * free_index, PGSIZE);
     if (result == -1)
         return -1;
@@ -827,7 +826,7 @@ int write_page_to_file(struct proc *p, uint64 user_page_VA, pagetable_t pagetabl
     p->file_pages[free_index].page_order = 0;
     p->pages_in_file_counter++;
     p->pages_in_memory_counter--;
-    printf("PID: %d in write_page_to_file(): added page num: %d to file\n",p->pid,user_page_VA / 4096);
+//    printf("PID: %d in write_page_to_file(): added page num: %d addr: %p to file\n",p->pid,user_page_VA / 4096,user_page_VA);
     return result;
 }
 
@@ -847,7 +846,7 @@ int read_page_from_file(struct proc *p, int memory_index, uint64 user_page_VA, c
             p->file_pages[i].state = P_UNUSED;
             p->pages_in_file_counter--;
             p->pages_in_memory_counter++;
-            printf("PID: %d in read_page_from_file(): added page num: %d to ram\n",p->pid,user_page_VA / 4096);
+//            printf("PID: %d in read_page_from_file(): added page num: %d addr: %p to ram\n",p->pid,user_page_VA / 4096,user_page_VA);
             return result;
         }
     }
