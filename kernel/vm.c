@@ -517,7 +517,7 @@ void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     if (!pte)
         panic("PTE of swapped out page is missing\n");
     // TODO: shoult it be pte = PTE_FLAGS(*pte) or pte &= PTE_FLAGS(*pte)
-//    *pte &= PTE_FLAGS(*pte); // clear junk physical address
+    *pte &= PTE_FLAGS(*pte); // clear junk physical address
     *pte |= PTE_PG; // turn on Paged out to storage bit
     *pte &= ~PTE_V; // turn off valid bit
     sfence_vma(); //flush the TLB
@@ -563,9 +563,10 @@ void add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
         p->memory_pages[free_index].access_count = 0xFFFFFFFF; // -1
     #endif
 }
-static char buff[PGSIZE];
+//static char buff[PGSIZE];
 
 int get_page_from_file(uint64 r_stval) {
+    char* buffer = kalloc();
     struct proc *p = myproc();
     p->page_fault_counter++;
     uint64 user_page_va = PGROUNDDOWN(r_stval);
@@ -579,8 +580,9 @@ int get_page_from_file(uint64 r_stval) {
     // have free space in the memory
     if (free_index >= 0) {
         update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page, free_index);
-        read_page_from_file(p, free_index, user_page_va, buff);
-        memmove(new_page, buff, PGSIZE);
+        read_page_from_file(p, free_index, user_page_va, buffer);
+        memmove(new_page, buffer, PGSIZE);
+        kfree(buffer);
         return 1;
     }
         // else memory is full & swapping is needed
@@ -589,17 +591,15 @@ int get_page_from_file(uint64 r_stval) {
         struct page_metadata_struct out_page = p->memory_pages[out_index];
         // insert new page into memory
         update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page, out_index);
-        read_page_from_file(p, out_index, user_page_va, buff);
-        memmove(new_page, buff, PGSIZE);
+        read_page_from_file(p, out_index, user_page_va, buffer);
+        memmove(new_page, buffer, PGSIZE);
         // write page to file
         uint64 out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
         write_page_to_file(p, out_page.user_page_VA, out_page.pagetable);
         update_page_out_pte(out_page.pagetable, out_page.user_page_VA);
         // free physical memory
         kfree((void *) out_page_pa); // free swapped page
-        // free pte & restore flags
-
-
+        kfree(buffer);
         return 1;
     }
 }
@@ -686,8 +686,7 @@ int SCFIFO_algorithm() {
     page_index = -1;
     page_order = 0xffffffff;
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-        if (p->memory_pages[i].state == P_USED &&
-        p->memory_pages[i].user_page_VA != 0x0000000000000000 && p->memory_pages[i].page_order <= page_order) {
+        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].page_order <= page_order) {
             page_index = i;
             page_order = p->memory_pages[i].page_order;
         }

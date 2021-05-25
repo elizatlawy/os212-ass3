@@ -61,9 +61,66 @@ void func(){
     exit(0);
 }
 
+void scfifo_test() {
+    fprintf(2, "SCFIFO test\n");
+    int i;
+    char *pages[31];
+    char input[10];
+
+    for (i = 0; i < 12; ++i)
+        pages[i] = sbrk(PGSIZE);
+    fprintf(2, "\nThe physical memory should be full - use Ctrl + P followned by Enter\n");
+    gets(input, 10);
+
+    fprintf(2, "\ncreating 3 pages... \n");
+    pages[13] = sbrk(PGSIZE);
+    pages[14] = sbrk(PGSIZE);
+    pages[15] = sbrk(PGSIZE);
+
+    fprintf(2, "\n\n3 pages are taken out - use Ctrl + P followned by Enter\n\n");
+    gets(input, 10);
+
+    fprintf(2, "\n\nWe accessed 2 pages and then accessed 2 pages we moved to Swapfile. should be 2 PGFLT - use Ctrl + P followned by Enter");
+    int j;
+    for (j = 3; j < 6; j = j + 2){
+        pages[j][1]='T';
+    }
+
+    pages[0][1] = 'T';
+    pages[1][1] = 'E';
+    fprintf(2, "\n\nwe wrote th the first 2 pages - use Ctrl + P followned by Enter\n\n");
+    gets(input, 10);
+
+    fprintf(2,"\n\nTesting the fork :\n\n");
+
+    if (fork() == 0) {
+        fprintf(2, "\nthis is the code of the child%d\n",getpid());
+        fprintf(2, "Child pages are identical to parent - use Ctrl + P followned by Enter\n");
+        gets(input, 10);
+
+        pages[10][0] = 'F';
+        fprintf(2, "\n\n a page fault should occur here - use Ctrl + P followned by Enter\n\n");
+        gets(input, 10);
+        char *command = "/ls";
+        char *args[4];
+        args[0] = "/ls";
+        args[1] = 0;
+        args[2] = 0;
+        if (exec(command,args) < 0) {
+            fprintf(2, "exec failed\n");
+        }
+        exit(0);
+    }
+    else {
+        //father waits until child finishes.
+        wait(0);
+    }
+}
+
 
 int main(int argc, char *argv[]) {
 //    fork_test();
     page_fault_test();
+//    scfifo_test();
     exit(0);
 }

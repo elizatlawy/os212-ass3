@@ -814,8 +814,7 @@ int get_free_file_index(struct proc *p) {
 
 int write_page_to_file(struct proc *p, uint64 user_page_VA, pagetable_t pagetable) {
     int free_index = get_free_file_index(p);
-//    uint64 user_page_pa = walkaddr(pagetable, user_page_VA);
-    pte_t *pte = walk(p->memory_pages[free_index].pagetable, p->memory_pages[free_index].user_page_VA,0);
+    pte_t *pte = walk(pagetable, user_page_VA,0);
     uint64 user_page_pa = PTE2PA(*pte);
     printf("write_page_to_file(): user_page_pa: %p\n",user_page_pa);
     int result = writeToSwapFile(p, (char *) user_page_pa, PGSIZE * free_index, PGSIZE);
@@ -838,8 +837,11 @@ int read_page_from_file(struct proc *p, int memory_index, uint64 user_page_VA, c
     for (int i = 0; i < max_page_num; i++) {
         if (p->file_pages[i].user_page_VA == user_page_VA) {
             result = readFromSwapFile(p, buff, i * PGSIZE, PGSIZE);
-            if (result == -1)
+            if (result == -1){
+                panic("read_page_from_file() - error in read\n");
                 break; //error in read
+            }
+
             p->memory_pages[memory_index] = p->file_pages[i];
             p->memory_pages[memory_index].page_order = p->page_order_counter++;
             p->file_pages[i].state = P_UNUSED;
