@@ -45,14 +45,14 @@ void exec_test() {
     printf("--------- exec_test starting ---------\n");
     if (fork() == 0) {
         printf("allocating pages\n");
-        int *arr = (int *) (malloc(sizeof(int) * 5 * PGSIZE));
-        for (int i = 0; i < 5 * PGSIZE; i = i + PGSIZE) {
-            arr[i] = i / PGSIZE;
+        int *array = (int *) (malloc(sizeof(int) * 7 * PGSIZE));
+        for (int i = 0; i < 7 * PGSIZE; i = i + PGSIZE) {
+            array[i] = i / PGSIZE;
         }
         printf("forking\n");
         int pid = fork();
         if (pid == 0) {
-            char *argv[] = {"test", "exectest", 0};
+            char *argv[] = {"test", "exec_test", 0};
             exec(argv[0], argv);
         } else {
             wait(0);
@@ -66,9 +66,9 @@ void exec_test() {
 
 void exec_test_child() {
     printf("child allocating pages\n");
-    int *arr = (int *) (malloc(sizeof(int) * 5 * PGSIZE));
-    for (int i = 0; i < 5 * PGSIZE; i = i + PGSIZE) {
-        arr[i] = i / PGSIZE;
+    int *array = (int *) (malloc(sizeof(int) * 7 * PGSIZE));
+    for (int i = 0; i < 7 * PGSIZE; i = i + PGSIZE) {
+        array[i] = i / PGSIZE;
     }
     printf("child exiting\n");
 }
@@ -99,7 +99,7 @@ void page_faults_test() {
 
 int main(int argc, char *argv[]) {
     if (argc >= 1) {
-        if (strcmp(argv[1], "exectest") == 0) {
+        if (strcmp(argv[1], "exec_test") == 0) {
             exec_test_child();
             exit(0);
         }
