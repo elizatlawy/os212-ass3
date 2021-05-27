@@ -525,9 +525,6 @@ sched(void) {
 // Give up the CPU for one scheduling round.
 void
 yield(void) {
-//    #if defined(NFUA) || defined(LAPA)
-//        update_access_counter();
-//    #endif
     struct proc *p = myproc();
     acquire(&p->lock);
     p->state = RUNNABLE;

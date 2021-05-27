@@ -292,7 +292,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
                 printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
                 print_memory_metadata_state(p);
-                panic("Prock is too big\n");
+                panic("Proc is too big\n");
             }
             if (old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES) {
                 // no more space in memory need to swap
@@ -654,6 +654,7 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
 //#if defined(NFUA) || defined(LAPA)
 // Updates the access counter in NFUA and LAPA paging policies
 void update_access_counter(struct proc* p){
+
     uint addr = 0x80000000; // 10000000000000000000000000000000 in binary
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
@@ -674,7 +675,7 @@ void update_access_counter(struct proc* p){
 uint num_of_ones (uint access_count) {
   int num_of_ones = 0;
   while(access_count) {
-    if (access_count%2 != 0)
+    if (access_count % 2 != 0)
         num_of_ones++;
     access_count /= 2;
   }
