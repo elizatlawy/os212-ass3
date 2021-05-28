@@ -139,13 +139,7 @@ UPROGS=\
 	$U/_wc\
 	$U/_zombie\
 	$U/_lazytests\
-	$U/_test\
 	$U/_sanity\
-	$U/_dolavtest\
-	$U/_tests2\
-	$U/_test3\
-	$U/_usertests2\
-
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

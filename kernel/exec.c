@@ -38,29 +38,14 @@ exec(char *path, char **argv) {
         goto bad;
 
 
-
     if (!is_none_policy() && p->pid > 2) {
+        clear_memory_metadata();
         if (myproc()->swapFile)
             // delete parent copied swapFile
             removeSwapFile(myproc());
-        p->page_order_counter = 0;
-        p->pages_in_file_counter = 0;
-        p->pages_in_memory_counter = 0;
-        p->page_fault_counter = 0;
+
         // create new swapFile
         createSwapFile(myproc());
-        for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-            p->memory_pages[i].state = P_UNUSED;
-            p->memory_pages[i].user_page_VA = 0;
-            p->memory_pages[i].page_order = 0;
-            p->memory_pages[i].access_count = 0;
-        }
-        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
-            p->file_pages[i].state = P_UNUSED;
-            p->file_pages[i].user_page_VA = 0;
-            p->file_pages[i].page_order = 0;
-            p->file_pages[i].access_count = 0;
-        }
     }
     // Load program into memory.
     for (i = 0, off = elf.phoff; i < elf.phnum; i++, off += sizeof(ph)) {
@@ -140,14 +125,9 @@ exec(char *path, char **argv) {
     p->trapframe->sp = sp; // initial stack pointer
     proc_freepagetable(oldpagetable, oldsz);
 
-    for(uint page = 0; page < PGSIZE*3; page += PGSIZE){
+    for (uint page = 0; page < PGSIZE * 3; page += PGSIZE) {
         add_to_memory_page_metadata(p->pagetable, page);
     }
-
-
-//    printf("pid: %d in exec(): just before return\n", p->pid);
-//    print_memory_metadata_state(p);
-
     return argc; // this ends up in a0, the first argument to main(argc, argv)
 
     bad:

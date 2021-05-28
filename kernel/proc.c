@@ -327,9 +327,6 @@ fork(void) {
     np->state = RUNNABLE;
     release(&np->lock);
 
-//    printf("pid: %d in fork(): just before return\n", p->pid);
-//    print_memory_metadata_state(p);
-
     return pid;
 }
 
@@ -364,8 +361,11 @@ exit(int status) {
             p->ofile[fd] = 0;
         }
     }
-    if (p->pid > 2 && !is_none_policy())
+    if (p->pid > 2 && !is_none_policy()){
         removeSwapFile(p);
+        clear_memory_metadata();
+    }
+
 
     begin_op();
     iput(p->cwd);
@@ -381,24 +381,7 @@ exit(int status) {
     wakeup(p->parent);
 
     acquire(&p->lock);
-    if (!is_none_policy() && p->pid > 2) {
-        for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-            p->memory_pages[i].state = P_UNUSED;
-            p->memory_pages[i].user_page_VA = 0;
-            p->memory_pages[i].page_order = 0;
-            p->memory_pages[i].access_count = 0;
-        }
-        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
-            p->file_pages[i].state = P_UNUSED;
-            p->file_pages[i].user_page_VA = 0;
-            p->file_pages[i].page_order = 0;
-            p->file_pages[i].access_count = 0;
-        }
-    }
-    p->page_order_counter = 0;
-    p->pages_in_file_counter = 0;
-    p->pages_in_memory_counter = 0;
-    p->page_fault_counter = 0;
+
     p->xstate = status;
     p->state = ZOMBIE;
 
@@ -675,15 +658,25 @@ procdump(void) {
     }
 }
 
-//#if defined(NFUA) || defined(LAPA)
-//void update_pages_acceess_counter(){
-//    struct proc *p;
-//    for (p = proc; p < &proc[NPROC]; p++) {
-//        acquire(&p->lock);
-//        if ((p->pid > 2) && (p->state == SLEEPING || p->state == RUNNABLE || p->state == RUNNING)) {
-//            update_access_counter(p); // implemented in vm.c
-//        }
-//        release(&p->lock);
-//    }
-//}
-//#endif
+void clear_memory_metadata(){
+    struct proc *p = myproc();
+    p->page_order_counter = 0;
+    p->pages_in_file_counter = 0;
+    p->pages_in_memory_counter = 0;
+    p->page_fault_counter = 0;
+
+    for (int i = 0; i < MAX_PYSC_PAGES; i++) {
+        p->memory_pages[i].state = P_UNUSED;
+        p->memory_pages[i].user_page_VA = 0;
+        p->memory_pages[i].page_order = 0;
+        p->memory_pages[i].access_count = 0;
+    }
+    for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
+        p->file_pages[i].state = P_UNUSED;
+        p->file_pages[i].user_page_VA = 0;
+        p->file_pages[i].page_order = 0;
+        p->file_pages[i].access_count = 0;
+    }
+
+}
+
