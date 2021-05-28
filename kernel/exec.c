@@ -52,14 +52,12 @@ exec(char *path, char **argv) {
         for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             p->memory_pages[i].state = P_UNUSED;
             p->memory_pages[i].user_page_VA = 0;
-            p->memory_pages[i].pagetable = 0;
             p->memory_pages[i].page_order = 0;
             p->memory_pages[i].access_count = 0;
         }
         for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
             p->file_pages[i].state = P_UNUSED;
             p->file_pages[i].user_page_VA = 0;
-            p->file_pages[i].pagetable = 0;
             p->file_pages[i].page_order = 0;
             p->file_pages[i].access_count = 0;
         }
@@ -149,6 +147,7 @@ exec(char *path, char **argv) {
 
 //    printf("pid: %d in exec(): just before return\n", p->pid);
 //    print_memory_metadata_state(p);
+
     return argc; // this ends up in a0, the first argument to main(argc, argv)
 
     bad:

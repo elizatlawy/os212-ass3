@@ -7,7 +7,7 @@
 
 #define CHILD_NUM 2
 #define PGSIZE 4096
-#define MEM_SIZE 10000 /2
+#define MEM_SIZE 10000 / 2
 #define SZ 1200
 
 #define PRINT_TEST_START(TEST_NAME)   printf("\n----------------------\nstarting test - %s\n----------------------\n",TEST_NAME);

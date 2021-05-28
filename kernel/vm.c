@@ -246,19 +246,15 @@ void swap(pagetable_t pagetable, uint64 user_page_va) {
     struct proc *p = myproc();
     // move selected page from memory to swapFile
     int out_index = get_swap_out_page_index();
-//    printf("PID: %d swap(): out_index: %d addr: %p\n",p->pid,out_index,p->memory_pages[out_index].user_page_VA);
-    pte_t *pte = walk(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA,0);
+    pte_t *pte = walk(p->pagetable, p->memory_pages[out_index].user_page_VA,0);
     uint64 out_page_pa = PTE2PA(*pte);
-//    uint64 out_page_pa = walkaddr(p->memory_pages[out_index].pagetable,p->memory_pages[out_index].user_page_VA);
-//    if (out_page_pa == 0)
-//        panic("inside swap out_page_pa is zero\n");
-    int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->memory_pages[out_index].pagetable);
+    int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->pagetable);
     if (result == -1)
         panic("inside swap write_page_to_file failed\n");
     // clear the page from memory
     kfree((void *) out_page_pa); //free swapped page
     p->memory_pages[out_index].state = P_UNUSED;
-    update_page_out_pte(p->memory_pages[out_index].pagetable, p->memory_pages[out_index].user_page_VA);
+    update_page_out_pte(p->pagetable, p->memory_pages[out_index].user_page_VA);
     // move the requested page to memory
     add_to_memory_page_metadata(pagetable, user_page_va);
 }
@@ -290,13 +286,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
         }
         if (p->pid > 2 && !is_none_policy() && p->pagetable == pagetable){
             if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
-                printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
-                print_memory_metadata_state(p);
-                panic("Proc is too big\n");
+                printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages - Proc is too big killing proc...\n");
+               p->killed = 1;
+               exit(-1);
             }
             if (old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES) {
                 // no more space in memory need to swap
-//                printf("pid: %d  uvmalloc(): no space in memory going to swap for new page num: %d\n",p->pid, num_of_new_page);
                 swap(pagetable, a);
             }
                 // have space in memory
@@ -552,7 +547,6 @@ void add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
     struct proc *p = myproc();
     int free_index = get_free_memory_page_index();
     p->memory_pages[free_index].state = P_USED;
-    p->memory_pages[free_index].pagetable = pagetable;
     p->memory_pages[free_index].user_page_VA = user_page_va;
     p->memory_pages[free_index].page_order = p->page_order_counter++;
     p->pages_in_memory_counter++;
@@ -566,7 +560,6 @@ void add_to_memory_page_metadata(pagetable_t pagetable, uint64 user_page_va) {
 //static char buff[PGSIZE];
 
 int get_page_from_file(uint64 r_stval) {
-//    char* buffer = kalloc();
     struct proc *p = myproc();
     p->page_fault_counter++;
 //    printf("PID: %d get_page_from_file(): page_fault_counter: %d\n",p->pid,p->page_fault_counter);
@@ -582,8 +575,6 @@ int get_page_from_file(uint64 r_stval) {
     if (free_index >= 0) {
         update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page, free_index);
         read_page_from_file(p, free_index, user_page_va, new_page);
-//        memmove(new_page, buffer, PGSIZE);
-//        kfree(buffer);
         return 1;
     }
         // else memory is full & swapping is needed
@@ -593,17 +584,14 @@ int get_page_from_file(uint64 r_stval) {
         // insert new page into memory
         update_page_in_pte(p->pagetable, user_page_va, (uint64) new_page, out_index);
         read_page_from_file(p, out_index, user_page_va, new_page);
-//        memmove(new_page, buffer, PGSIZE);
         // write page to file
-//        uint64 out_page_pa = walkaddr(out_page.pagetable, out_page.user_page_VA);
-        write_page_to_file(p, out_page.user_page_VA, out_page.pagetable);
-        update_page_out_pte(out_page.pagetable, out_page.user_page_VA);
+        write_page_to_file(p, out_page.user_page_VA, p->pagetable);
+        update_page_out_pte(p->pagetable, out_page.user_page_VA);
         // free physical memory
-        pte_t *pte = walk(out_page.pagetable, out_page.user_page_VA,0);
+        pte_t *pte = walk(p->pagetable, out_page.user_page_VA,0);
         uint64 out_page_pa = PTE2PA(*pte);
         if(out_page_pa != 0)
             kfree((void *) out_page_pa); // free swapped page
-//        kfree(buffer);
         return 1;
     }
 }
@@ -621,8 +609,7 @@ int page_in_file(uint64 user_page_va, pagetable_t pagetable) {
 void remove_from_memory_meta_data(uint64 user_page_va, pagetable_t pagetable) {
     struct proc *p = myproc();
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
-        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].user_page_VA == user_page_va &&
-            p->memory_pages[i].pagetable == pagetable) {
+        if (p->memory_pages[i].state == P_USED && p->memory_pages[i].user_page_VA == user_page_va && p->pagetable == pagetable) {
             p->memory_pages[i].access_count = 0;
             p->memory_pages[i].page_order = 0;
             p->pages_in_memory_counter--;
@@ -639,8 +626,7 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
     struct proc *p = myproc();
     for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
         if (p->file_pages[i].state == P_USED
-            && p->file_pages[i].user_page_VA == user_page_va
-            && p->file_pages[i].pagetable == pagetable) {
+            && p->file_pages[i].user_page_VA == user_page_va && p->pagetable == pagetable) {
             p->file_pages[i].access_count = 0;
             p->file_pages[i].page_order = 0;
             p->pages_in_file_counter--;
@@ -658,7 +644,7 @@ void update_access_counter(struct proc* p){
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
             p->memory_pages[i].access_count >>= 1; // Shift-right
-            pte_t *pte = walk(p->memory_pages[i].pagetable, p->memory_pages[i].user_page_VA,0);
+            pte_t *pte = walk(p->pagetable, p->memory_pages[i].user_page_VA,0);
 //            printf("PID: %d update_access_counter(): pte addr after walk is: %p PTE_A bit: %d \n",p->pid,pte, *pte & PTE_A);
             if (*pte & PTE_A){
                 p->memory_pages[i].access_count |= addr; // add 1 to the most significant bit
@@ -695,7 +681,7 @@ int SCFIFO_algorithm() {
             page_order = p->memory_pages[i].page_order;
         }
     }
-    pte_t *pte = walk(p->memory_pages[page_index].pagetable, p->memory_pages[page_index].user_page_VA,0);
+    pte_t *pte = walk(p->pagetable, p->memory_pages[page_index].user_page_VA,0);
     if (*pte & PTE_A) {
         *pte &= ~PTE_A; // turn off PTE_A flag
         p->memory_pages[page_index].page_order = p->page_order_counter++; // put this page to the end of the queue

@@ -91,12 +91,9 @@ enum page_metadata_state {
 // pages struct
 struct page_metadata_struct{
     enum page_metadata_state state;
-    pagetable_t pagetable;
     uint64 user_page_VA;
     uint page_order;
     uint access_count;
-
-
 };
 
 // Per-process state

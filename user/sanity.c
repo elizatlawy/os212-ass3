@@ -8,7 +8,9 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 
-#define ARR_SIZE 55000 // 14 pages
+//#define ARR_SIZE 55000 // 14 pages
+#define ARR_SIZE 555000 // 14 pages
+
 #define PGSIZE 4096
 
 void fork_test() {

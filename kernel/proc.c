@@ -293,13 +293,13 @@ fork(void) {
         np->page_order_counter = p->page_order_counter;
         np->pages_in_file_counter = p->pages_in_file_counter;
         np->pages_in_memory_counter = p->pages_in_memory_counter;
+        // copy memory meta data
         for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             np->memory_pages[i] = p->memory_pages[i]; // copy memory_pages list
-            np->memory_pages[i].pagetable = np->pagetable;  // replace parent pagetable with child new pagetable
         }
+        // copy file pages meta data
         for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
             np->file_pages[i] = p->file_pages[i]; //  copies file_pages list
-            np->file_pages[i].pagetable = np->pagetable;   // replace parent pagetable with child new pagetable
         }
     }
     // copy saved user registers.
@@ -384,14 +384,12 @@ exit(int status) {
     if (!is_none_policy() && p->pid > 2) {
         for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             p->memory_pages[i].state = P_UNUSED;
-            p->memory_pages[i].pagetable = 0;
             p->memory_pages[i].user_page_VA = 0;
             p->memory_pages[i].page_order = 0;
             p->memory_pages[i].access_count = 0;
         }
         for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
             p->file_pages[i].state = P_UNUSED;
-            p->file_pages[i].pagetable = 0;
             p->file_pages[i].user_page_VA = 0;
             p->file_pages[i].page_order = 0;
             p->file_pages[i].access_count = 0;
@@ -677,15 +675,15 @@ procdump(void) {
     }
 }
 
-#if defined(NFUA) || defined(LAPA)
-void update_pages_acceess_counter(){
-    struct proc *p;
-    for (p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        if ((p->pid > 2) && (p->state == SLEEPING || p->state == RUNNABLE || p->state == RUNNING)) {
-            update_access_counter(p); // implemented in vm.c
-        }
-        release(&p->lock);
-    }
-}
-#endif
+//#if defined(NFUA) || defined(LAPA)
+//void update_pages_acceess_counter(){
+//    struct proc *p;
+//    for (p = proc; p < &proc[NPROC]; p++) {
+//        acquire(&p->lock);
+//        if ((p->pid > 2) && (p->state == SLEEPING || p->state == RUNNABLE || p->state == RUNNING)) {
+//            update_access_counter(p); // implemented in vm.c
+//        }
+//        release(&p->lock);
+//    }
+//}
+//#endif
