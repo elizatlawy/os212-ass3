@@ -185,13 +185,13 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free) {
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
         if ((pte = walk(pagetable, a, 0)) == 0)
             panic("uvmunmap: walk");
-        // TODO: add check if the pte is also bot PTE_PG
+        // check PTE_PG to see if the pte is in file
         if ((*pte & PTE_V) == 0 && (*pte & PTE_PG) == 0)
             panic("uvmunmap: not mapped");
         if (PTE_FLAGS(*pte) == PTE_V)
             panic("uvmunmap: not a leaf");
         // free only if page is in memory
-        if (do_free && (*pte & PTE_PG) == 0) {
+        if (do_free && (*pte & PTE_V) == 0) {
             uint64 pa = PTE2PA(*pte);
             if (pa != 0)
                 kfree((void *) pa);
@@ -248,9 +248,7 @@ void swap(pagetable_t pagetable, uint64 user_page_va) {
     int out_index = get_swap_out_page_index();
     pte_t *pte = walk(p->pagetable, p->memory_pages[out_index].user_page_VA, 0);
     uint64 out_page_pa = PTE2PA(*pte);
-    int result = write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->pagetable);
-    if (result == -1)
-        panic("inside swap write_page_to_file failed\n");
+    write_page_to_file(p, p->memory_pages[out_index].user_page_VA, p->pagetable);
     // clear the page from memory
     kfree((void *) out_page_pa); //free swapped page
     p->memory_pages[out_index].state = P_UNUSED;
@@ -284,12 +282,15 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz) {
             uvmdealloc(pagetable, a, oldsz);
             return 0;
         }
-        if (p->pid > 2 && !is_none_policy() && p->pagetable == pagetable) {
+        if (p->pid > 2 && !is_none_policy()) {
+            // more then 32 pages -> kill proc
             if (p->pages_in_memory_counter + p->pages_in_file_counter == MAX_TOTAL_PAGES) {
-                printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n");
+                printf("PID: %d inisde uvmalloc(): try to kalloc more then 32 pages\n",p->pid);
+                kfree(mem);
+                uvmdealloc(pagetable, a, oldsz);
                 panic("uvmalloc(): Proc is too big\n");
             }
-            if (old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES) {
+            else if (old_num_of_pages_in_mem + num_of_new_page > MAX_PYSC_PAGES) {
                 // no more space in memory need to swap
                 swap(pagetable, a);
             }
@@ -509,7 +510,6 @@ void update_page_out_pte(pagetable_t pagetable, uint64 user_page_va) {
     uint64 * pte = walk(pagetable, user_page_va, 0);
     if (!pte)
         panic("PTE of swapped out page is missing\n");
-    // TODO: shoult it be pte = PTE_FLAGS(*pte) or pte &= PTE_FLAGS(*pte)
     *pte &= PTE_FLAGS(*pte); // clear junk physical address
     *pte |= PTE_PG; // turn on Paged out to storage bit
     *pte &= ~PTE_V; // turn off valid bit
@@ -588,6 +588,7 @@ int get_page_from_file(uint64 r_stval) {
 }
 
 int page_in_file(uint64 user_page_va, pagetable_t pagetable) {
+
     pte_t *pte = walk(pagetable, user_page_va, 0);
     int found = (*pte & PTE_PG); // if return 1 page is in file
     return found;
@@ -718,9 +719,10 @@ int first_only_algorithm() {
 }
 
 int get_swap_out_page_index() {
-//#if defined(NFUA) || defined(LAPA)
-//    update_access_counter(myproc());
-//#endif
+    // update the access counter before using swap algorithm in order to update AGING data
+#if defined(NFUA) || defined(LAPA)
+    update_access_counter(myproc());
+#endif
 #ifdef SCFIFO
     return SCFIFO_algorithm();
 #endif

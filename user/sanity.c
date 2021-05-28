@@ -8,8 +8,6 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 
-#define ARR_SIZE 55000 // 14 pages
-
 #define PGSIZE 4096
 
 void fork_test() {
@@ -44,8 +42,8 @@ void exec_test() {
     printf("--------- exec_test starting ---------\n");
     if (fork() == 0) {
         printf("allocating pages\n");
-        int *array = (int *) (malloc(sizeof(int) * 7 * PGSIZE));
-        for (int i = 0; i < 7 * PGSIZE; i = i + PGSIZE) {
+        int *array = (int *) (malloc(sizeof(int) * 6 * PGSIZE));
+        for (int i = 0; i < 6 * PGSIZE; i = i + PGSIZE) {
             array[i] = i / PGSIZE;
         }
         printf("forking\n");
@@ -66,8 +64,8 @@ void exec_test() {
 
 void exec_child_test() {
     printf("child allocating pages\n");
-    int *array = (int *) (malloc(sizeof(int) * 7 * PGSIZE));
-    for (int i = 0; i < 7 * PGSIZE; i = i + PGSIZE) {
+    int *array = (int *) (malloc(sizeof(int) * 6 * PGSIZE));
+    for (int i = 0; i < 6 * PGSIZE; i = i + PGSIZE) {
         array[i] = i / PGSIZE;
     }
     printf("Num of page faults: %d \n", page_fault_num());
@@ -76,38 +74,34 @@ void exec_child_test() {
 
 
 
-// when updating only in scheduler:
-// SCFIFO: 17
-// LAPA: 11
-// NFUA: 10
 
-// when updating only in scheduler & before calling page_out algo:
-// SCFIFO: 17
-// LAPA: 8
-// NFUA: 6
+// with only 2 loop:
+// SCFIFO: 18
+// LAPA: 10
+// NFUA: 9
 
 // with only 1 loop:
 // SCFIFO: 18
-// LAPA: 7
+// LAPA: 8
 // NFUA: 7
 void page_faults_test() {
     printf("--------- page_faults_test starting ---------\n");
-    char *arr;
-    int i;
-    arr = malloc(ARR_SIZE); // allocates 14 pages (sums to 17 pages - to allow  swapping)
-    for (i = 0; i < ARR_SIZE; i++) {
-        arr[i] = 'X';        // write to memory
+    char * arr = malloc(PGSIZE*13); // allocates 13 pages
+    // after exec we already have: text, data, guard page, stack = 4, we malloc 13, total is: 17 pages - to allow swapping)
+    // note that malloc will save 16 pages  so total is 20 but we will only access to 13 of them.
+    for (int i = 0; i < PGSIZE*13; i++) {
+        arr[i] = '1';        // write to memory
     }
-    // write to memory for the second time to cause more page faults
-    for (i = 0; i < ARR_SIZE; i++) {
-        arr[i] = 'Y';        // write to memory
-    }
+    // write to memory for the second time to cause more page faults so we can see differences between NFUA & LAPA
+//    for (int i = 0; i < PGSIZE*13; i++) {
+//        arr[i] = '2';        // write to memory
+//    }
     free(arr);
     printf("Num of page faults: %d \n", page_fault_num());
     printf("--------- page_faults_test finished ---------\n");
 }
 
-void exec_page_faults_test(){
+void exec_page_faults_test() {
     int pid = fork();
     if (pid == 0) {
         char *argv[] = {"sanity", "page_faults_test", 0};
@@ -117,6 +111,7 @@ void exec_page_faults_test(){
         wait(0);
     }
 }
+
 
 int main(int argc, char *argv[]) {
     if (argc >= 1 && strcmp(argv[1], "exec_child_test") == 0) {
@@ -130,7 +125,6 @@ int main(int argc, char *argv[]) {
     exec_test();
     fork_test();
     alloc_dealloc_test();
-    // the page_faults_test() should be run with exec on a "clean" process
-    exec_page_faults_test();
+    exec_page_faults_test();  // should be run with exec on a "clean" process
     exit(0);
 }

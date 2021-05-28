@@ -73,6 +73,7 @@ usertrap(void) {
             printf("PID: %d inside usertrap(): page: %p is not in file\n", p->pid,r_stval());
             printf("usertrap(): unexpected scause %d pid=%d\n", r_scause(), p->pid);
             printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+            print_memory_metadata_state(p);
             p->killed = 1;
         }
 

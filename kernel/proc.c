@@ -366,7 +366,6 @@ exit(int status) {
         clear_memory_metadata();
     }
 
-
     begin_op();
     iput(p->cwd);
     end_op();
@@ -455,6 +454,7 @@ scheduler(void) {
     for (;;) {
         // Avoid deadlock by ensuring that devices can interrupt.
         intr_on();
+        int found = 0;
         for (p = proc; p < &proc[NPROC]; p++) {
             acquire(&p->lock);
             if (p->state == RUNNABLE) {
@@ -471,8 +471,13 @@ scheduler(void) {
                 update_access_counter(p);
                 #endif
                 c->proc = 0;
+                found = 1;
             }
             release(&p->lock);
+        }
+        if(found == 0) {
+            intr_on();
+            asm volatile("wfi");
         }
     }
 }

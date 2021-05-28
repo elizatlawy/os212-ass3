@@ -125,9 +125,6 @@ exec(char *path, char **argv) {
     p->trapframe->sp = sp; // initial stack pointer
     proc_freepagetable(oldpagetable, oldsz);
 
-    for (uint page = 0; page < PGSIZE * 3; page += PGSIZE) {
-        add_to_memory_page_metadata(p->pagetable, page);
-    }
     return argc; // this ends up in a0, the first argument to main(argc, argv)
 
     bad:
