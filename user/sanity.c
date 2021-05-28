@@ -84,19 +84,25 @@ void exec_child_test() {
 // SCFIFO: 18
 // LAPA: 8
 // NFUA: 7
+
 // ++++With sbrk of 14 pages total is: 17:++++
 // with only 1 loop:
 // SCFIFO: 12
 // LAPA: 1
 // NFUA: 1
 
+// ++++With sbrk of 16 pages total is: 20:++++
+// with only 1 loop:
+// SCFIFO: 16
+// LAPA: 5
+// NFUA: 4 - the minimum possible
 void page_faults_test() {
     printf("--------- page_faults_test starting ---------\n");
-    char * arr = malloc(PGSIZE*13); // allocates 13 pages
-//    char * arr = sbrk(PGSIZE*14); // allocates 14 pages - total 17
+//    char * arr = malloc(PGSIZE*16); // allocates 13 pages
+    char * arr = sbrk(PGSIZE*16); // allocates 14 pages - total 17
     // after exec we already have: text, data, guard page, stack = 4, we malloc 13, total is: 17 pages - to allow swapping)
     // note that malloc will save 16 pages  so total is 20 but we will only access to 13 of them.
-    for (int i = 0; i < PGSIZE*14; i++) {
+    for (int i = 0; i < PGSIZE*16; i++) {
         arr[i] = '1';        // write to memory
     }
     // write to memory for the second time to cause more page faults so we can see differences between NFUA & LAPA
