@@ -7,7 +7,6 @@
 #include "defs.h"
 
 
-
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -135,7 +134,7 @@ allocproc(void) {
         release(&p->lock);
         return 0;
     }
-    if(p->pid > 2 && !is_none_policy()){
+    if (p->pid > 2 && !is_none_policy()) {
         release(&p->lock);
         createSwapFile(p);
         acquire(&p->lock);
@@ -354,8 +353,6 @@ reparent(struct proc *p) {
 void
 exit(int status) {
     struct proc *p = myproc();
-//    printf("exit(): before cleaning the proc\n");
-//    print_memory_metadata_state(p);
     if (p == initproc)
         panic("init exiting");
 
@@ -367,7 +364,7 @@ exit(int status) {
             p->ofile[fd] = 0;
         }
     }
-    if(p->pid > 2 && !is_none_policy())
+    if (p->pid > 2 && !is_none_policy())
         removeSwapFile(p);
 
     begin_op();
@@ -384,15 +381,15 @@ exit(int status) {
     wakeup(p->parent);
 
     acquire(&p->lock);
-    if(!is_none_policy() && p->pid > 2){
-        for (int i = 0; i < MAX_PYSC_PAGES; i++){
+    if (!is_none_policy() && p->pid > 2) {
+        for (int i = 0; i < MAX_PYSC_PAGES; i++) {
             p->memory_pages[i].state = P_UNUSED;
             p->memory_pages[i].pagetable = 0;
             p->memory_pages[i].user_page_VA = 0;
             p->memory_pages[i].page_order = 0;
             p->memory_pages[i].access_count = 0;
         }
-        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++){
+        for (int i = 0; i < MAX_TOTAL_PAGES - MAX_PYSC_PAGES; i++) {
             p->file_pages[i].state = P_UNUSED;
             p->file_pages[i].pagetable = 0;
             p->file_pages[i].user_page_VA = 0;
@@ -486,9 +483,12 @@ scheduler(void) {
                 p->state = RUNNING;
                 c->proc = p;
                 swtch(&c->context, &p->context);
-
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
+                // Update access counter after process finished running.
+                #if defined(NFUA) || defined(LAPA)
+                update_access_counter(p);
+                #endif
                 c->proc = 0;
             }
             release(&p->lock);
@@ -507,7 +507,6 @@ void
 sched(void) {
     int intena;
     struct proc *p = myproc();
-
     if (!holding(&p->lock))
         panic("sched p->lock");
     if (mycpu()->noff != 1)

@@ -654,7 +654,6 @@ void remove_from_file_meta_data(uint64 user_page_va, pagetable_t pagetable) {
 //#if defined(NFUA) || defined(LAPA)
 // Updates the access counter in NFUA and LAPA paging policies
 void update_access_counter(struct proc* p){
-
     uint addr = 0x80000000; // 10000000000000000000000000000000 in binary
     for (int i = 0; i < MAX_PYSC_PAGES; i++) {
         if (p->memory_pages[i].state == P_USED){
@@ -755,7 +754,9 @@ int first_only_algorithm(){
 }
 
 int get_swap_out_page_index() {
-    update_access_counter(myproc());
+//#if defined(NFUA) || defined(LAPA)
+//    update_access_counter(myproc());
+//#endif
     #ifdef SCFIFO
         return SCFIFO_algorithm();
     #endif

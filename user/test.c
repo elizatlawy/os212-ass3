@@ -1,113 +1,98 @@
-#include "kernel/param.h"
 #include "kernel/types.h"
 #include "kernel/stat.h"
-#include "user.h"
+#include "user/user.h"
 #include "kernel/fs.h"
-#include "kernel/fcntl.h"
-#include "kernel/syscall.h"
-#include "kernel/memlayout.h"
-#include "kernel/riscv.h"
 
-#define ARR_SIZE 55000 // 14 pages
 #define PGSIZE 4096
+#define ARR_SIZE 55000
+//#define ARR_SIZE 74096 // arr with size of 19 pages
+//#define ARR_SIZE 59096 // arr with 15 pages
+/*
+	Test used to check the swapping machanism in fork.
+	Best tested when LIFO is used (for more swaps)
+*/
+void forkTest() {
+    int i;
+    char *arr;
+//    arr = malloc (50000); //allocates 13 pages (sums to 16), in lifo, OS puts page #15 in file.
+    arr = malloc(60000); //allocates 14 pages (sums to 17), in lifo, OS puts page #16 in file.
 
-void fork_test(){
 
-    printf("--------- fork_test starting ---------\n");
-    if (fork() == 0){
-        for (int i = 0; i < 25; i++){
-            printf("doing sbrk number %d\n", i);
-            sbrk(PGSIZE);
-        }
-        exit(0);
+    for (i = 0; i < 50; i++) {
+        arr[59100 + i] = 'A'; //last six A's stored in page #17, the rest in #16
+        arr[55200 + i] = 'B'; //all B's are stored in page #16.
     }
-    wait(0);
-    printf("--------- fork_test finished ---------\n");
-}
+    arr[59100 + i] = 0; //for null terminating string...
+    arr[55200 + i] = 0;
 
-void alloc_dealloc_test() {
-    printf("--------- alloc_dealloc_test starting ---------\n");
-    char *alloc = malloc(25 * PGSIZE);
-    for (int i = 0; i < 25; i++)
-    {
-        alloc[i * PGSIZE] = 'a' + i;
-        printf("added i : %d\n", i);
-    }
-    for (int i = 0; i < 25; i++)
-        printf("alloc[%d] = %c\n", i * PGSIZE, alloc[i * PGSIZE]);
-    free(alloc);
-    printf("--------- alloc_dealloc_test finished ---------\n");
-}
-
-
-void exec_test() {
-
-    printf("--------- exec_test starting ---------\n");
-    if (fork() == 0) {
-        printf("allocating pages\n");
-        int *array = (int *) (malloc(sizeof(int) * 7 * PGSIZE));
-        for (int i = 0; i < 7 * PGSIZE; i = i + PGSIZE) {
-            array[i] = i / PGSIZE;
+    if (fork() == 0) { //is son
+        for (i = 40; i < 50; i++) {
+            arr[59100 + i] = 'C'; //changes last ten A's to C
+            arr[55200 + i] = 'D'; //changes last ten B's to D
         }
-        printf("forking\n");
-        int pid = fork();
-        if (pid == 0) {
-            char *argv[] = {"test", "exec_test", 0};
-            exec(argv[0], argv);
-        } else {
-            wait(0);
-        }
+        printf("SON: %s\n", &arr[59100]); // should print AAAAA..CCC...
+        printf("SON: %s\n", &arr[55200]); // should print BBBBB..DDD...
+        printf("\n");
+        free(arr);
         exit(0);
-    } else {
+    } else { //is parent
         wait(0);
+        printf("PARENT: %s\n", &arr[59100]); // should print AAAAA...
+        printf("PARENT: %s\n", &arr[55200]); // should print BBBBB...
+        free(arr);
     }
-    printf("--------- exec_test finished ---------\n");
-}
-
-void exec_test_child() {
-    printf("child allocating pages\n");
-    int *array = (int *) (malloc(sizeof(int) * 7 * PGSIZE));
-    for (int i = 0; i < 7 * PGSIZE; i = i + PGSIZE) {
-        array[i] = i / PGSIZE;
-    }
-    printf("child exiting\n");
 }
 
 
-// SCFIFO: 21
-// LAPA: 11
-// NFUA: 5
+static unsigned long int next = 1;
 
+int getRandNum() {
+    next = next * 1103515245 + 12341;
+    return (unsigned int) (next / 65536) % ARR_SIZE;
+}
 
-void page_faults_test() {
-    printf("--------- page_faults_test starting ---------\n");
+#define PAGE_NUM(addr) ((uint)(addr) & ~0xFFF)
+#define TEST_POOL 500
+
+/*
+Global Test:
+Allocates 17 pages (1 code, 1 space, 1 stack, 14 malloc)
+Using pseudoRNG to access a single cell in the array and put a number in it.
+Idea behind the algorithm:
+	Space page will be swapped out sooner or later with scfifo or lap.
+	Since no one calls the space page, an extra page is needed to play with swapping (hence the #17).
+	We selected a single page and reduced its page calls to see if scfifo and lap will become more efficient.
+
+Results (for TEST_POOL = 500):
+LIFO: 42 Page faults
+LAP: 18 Page faults
+SCFIFO: 35 Page faults
+
+ // our results: with ARR_SIZE 55000 - arr with 14 pages
+ SCFIFO: 20
+ NFUA: 8
+ LAPA: 11
+
+*/
+void globalTest() {
     char *arr;
     int i;
-    arr = malloc(ARR_SIZE); // allocates 14 pages (sums to 17 - to allow more then one swapping in scfifo)
-    for (i = 0; i <= 100; i++) {
-        arr[1] = 'X';        // write to memory
-        arr[ARR_SIZE - 1] = 'Y';
+    int randNum;
+    arr = malloc(ARR_SIZE); //allocates 14 pages (sums to 17 - to allow more then one swapping in scfifo)
+    for (i = 0; i < TEST_POOL; i++) {
+        randNum = getRandNum();    //generates a pseudo random number between 0 and ARR_SIZE
+        while (PGSIZE * 10 - 8 < randNum && randNum < PGSIZE * 10 + PGSIZE / 2 - 8)
+            randNum = getRandNum(); // gives page #13 50% less chance of being selected
+        //(redraw number if randNum is in the first half of page #13)
+        arr[randNum] = 'X';                // write to memory
     }
-
-    for (i = 0; i < ARR_SIZE-1; i++) {
-        arr[i] = 'Y';        // write to memory
-    }
-        free(arr);
-        printf("Num of page faults: %d \n", page_fault_num());
-        printf("--------- page_faults_test finished ---------\n");
+    free(arr);
+    printf("Num of page faults: %d \n", page_fault_num());
 }
 
-int main(int argc, char *argv[]) {
-    if (argc >= 1) {
-        if (strcmp(argv[1], "exec_test") == 0) {
-            exec_test_child();
-            exit(0);
-        }
-    }
-    exec_test();
-    fork_test();
-    alloc_dealloc_test();
-//    page_faults_test();
 
+int main(int argc, char *argv[]) {
+    globalTest();            //for testing each policy efficiency
+//    forkTest();			//for testing swapping machanism in fork.
     exit(0);
 }

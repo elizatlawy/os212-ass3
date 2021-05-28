@@ -156,24 +156,27 @@ kerneltrap() {
         panic("kerneltrap: interrupts enabled");
 
     if ((which_dev = devintr()) == 0) {
-        if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)) {
-//            printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
-            if (page_in_file(r_stval(), p->pagetable)){
-                get_page_from_file(r_stval());
-//                printf("PID: %d inside kerneltrap(): got page: %p from file\n", p->pid, r_stval());
-            }
-            else{
-                printf("PID: %d inside kerneltrap() page is not in file\n", p->pid);
-                printf("scause %d PID: %d\n", scause, p->pid);
-                printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
-                print_memory_metadata_state(p);
-                panic("kerneltrap");
-            }
-        } else {
-            printf("scause %d PID: %d\n", scause, p->pid);
-            printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
-            panic("kerneltrap");
-        }
+        printf("scause %d PID: %d\n", scause, p->pid);
+        printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+        panic("kerneltrap");
+//        if (!is_none_policy() && p->pid > 2 && (r_scause() == 13 || r_scause() == 15 || r_scause() == 12)) {
+////            printf("PID: %d inside kerneltrap(): got page fault:  %d , r_stval is: %p\n",p->pid,r_scause(), r_stval());
+//            if (page_in_file(r_stval(), p->pagetable)){
+//                get_page_from_file(r_stval());
+////                printf("PID: %d inside kerneltrap(): got page: %p from file\n", p->pid, r_stval());
+//            }
+//            else{
+//                printf("PID: %d inside kerneltrap() page is not in file\n", p->pid);
+//                printf("scause %d PID: %d\n", scause, p->pid);
+//                printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+//                print_memory_metadata_state(p);
+//                panic("kerneltrap");
+//            }
+//        } else {
+//            printf("scause %d PID: %d\n", scause, p->pid);
+//            printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
+//            panic("kerneltrap");
+//        }
     }
 
     // give up the CPU if this is a timer interrupt.
@@ -192,9 +195,9 @@ clockintr() {
     ticks++;
     wakeup(&ticks);
     release(&tickslock);
-    #if defined(NFUA) || defined(LAPA)
-        update_pages_acceess_counter(); //defined in proc.c
-    #endif
+//    #if defined(NFUA) || defined(LAPA)
+//        update_pages_acceess_counter(); //defined in proc.c
+//    #endif
 }
 
 // check if it's an external interrupt or software interrupt,
